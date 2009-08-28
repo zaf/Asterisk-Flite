@@ -1,0 +1,17 @@
+;
+; Flite Configuration
+;
+[general]
+;
+; Use cache (yes, no - defaults to no)
+;
+;usecache=yes
+;
+; If usecache=yes, a directory to store waveform cache files. 
+; The cache is never cleared (yet), so you must take care of cleaning it
+; yourself (just delete any or all files from the cache). 
+; THIS DIRECTORY *MUST* EXIST and must be writable from the asterisk process.
+; Defaults to /tmp/
+;
+;cachedir=/var/lib/asterisk/flitecache/
+;
