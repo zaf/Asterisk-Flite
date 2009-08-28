@@ -41,7 +41,7 @@ exten => 1234,1,Answer()
 exten => 1234,n,Flite("This is a simple F lite test in english.",any)
 	;Read a text file from disk and pass it to flite
 exten => 1234,n,ReadFile(MYTEXT=/path/myfile,200)
-exten => 1234,n,Flite("${MYTEXT},any)
+exten => 1234,n,Flite("${MYTEXT}",any)
 exten => 1234,n,Hangup()
 
 -------
