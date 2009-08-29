@@ -62,6 +62,19 @@ $ make install</p>
 <p>To install the sample configuration file, issue the following command after
 the 'make install' command:<br />
 $ make samples</p>
+<h2>Usage</h2>
+<p>Flite(text[,intkeys]) This will invoke the Flite TTS engine, send a text string,
+get back the resulting waveform and play it to the user, allowing any given
+interrupt keys to immediately terminate and return the value, or 'any' to 
+allow any number back.</p>
+<p>Asterisk dialplan example:<br /><br />
+;Flite Demo<br />
+exten => 1234,1,Answer()<br />
+exten => 1234,n,Flite("This is a simple F lite test in english.",any)<br />
+;Read a text file from disk and pass it to flite<br  />
+exten => 1234,n,ReadFile(MYTEXT=/path/myfile,200)<br />
+exten => 1234,n,Flite("${MYTEXT}",any)<br />
+exten => 1234,n,Hangup()</p>
 <h2>License</h2>
 <p>The Flite module for asterisk is distributed under the GNU General Public License v3</p>
 <h2>Authors</h2>
@@ -72,7 +85,8 @@ $ make samples</p>
 
     <h2>Download</h2>
     <p>
-      You can download this project in either
+      You can get the latest version <a href="http://cloud.github.com/downloads/zaf/Asterisk-Flite/app_Flite-1.6-0.1-beta.tar.gz">here</a>.<br />
+      Develompent snapshots are available in either
       <a href="http://github.com/zaf/Asterisk-Flite/zipball/master">zip</a> or
       <a href="http://github.com/zaf/Asterisk-Flite/tarball/master">tar</a> formats.
     </p>
