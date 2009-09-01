@@ -68,7 +68,7 @@ static int app_exec(struct ast_channel *chan, void *data)
 	int usecache = 0;
 	int writecache = 0;
 	char MD5_name[33] = "";
-	char cachefile[MAXFESTLEN] = "";
+	char cachefile[MAXLEN] = "";
 	char tmp_name[22];
 	char wav_tmp_name[26];
 	cst_voice *voice;
