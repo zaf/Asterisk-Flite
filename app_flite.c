@@ -46,7 +46,7 @@ ASTERISK_FILE_VERSION(__FILE__, "$Revision: 00 $")
 
 #define AST_MODULE "Flite"
 #define FLITE_CONFIG "flite.conf"
-#define MAXFESTLEN 2048
+#define MAXLEN 2048
 
 cst_voice *register_cmu_us_kal(void);
 
@@ -106,7 +106,7 @@ static int app_exec(struct ast_channel *chan, void *data)
 	/*Cache mechanism */
 	if (usecache) {
 		ast_md5_hash(MD5_name, args.text);
-		if (strlen(cachedir) + strlen(MD5_name) + 5 <= MAXFESTLEN) {
+		if (strlen(cachedir) + strlen(MD5_name) + 5 <= MAXLEN) {
 			ast_debug(1, "Flite: Activating cache mechanism...\n");
 			snprintf(cachefile, sizeof(cachefile), "%s/%s", cachedir, MD5_name);
 			if (ast_fileexists(cachefile, NULL, NULL) <= 0) {

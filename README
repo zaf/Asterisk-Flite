@@ -48,4 +48,4 @@ exten => 1234,n,Hangup()
 License
 -------
 The Flite module for asterisk is distributed under the GNU General Public 
-License v3. See COPYING for details.
+License v2. See COPYING for details.
