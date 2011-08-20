@@ -11,16 +11,16 @@ CC=gcc
 OPTIMIZE=-O2
 DEBUG=-g
 
-LIBS+=-lm -lflite -lflite_cmulex -lflite_usenglish -lflite_cmu_us_kal
+LIBS+=-lm -lflite -lflite_cmulex -lflite_usenglish -lflite_cmu_us_kal16 -lflite_cmu_us_kal
 CFLAGS+=-pipe -fPIC -Wall -Wstrict-prototypes -Wmissing-prototypes -Wmissing-declarations -D_REENTRANT -D_GNU_SOURCE
 
 all: _all
-	@echo " +--------- app_flite Build Complete --------+"  
-	@echo " + app_flite has successfully been built,    +"  
+	@echo " +--------- app_flite Build Complete --------+"
+	@echo " + app_flite has successfully been built,    +"
 	@echo " + and can be installed by running:          +"
 	@echo " +                                           +"
-	@echo " +               make install                +"  
-	@echo " +-------------------------------------------+" 
+	@echo " +               make install                +"
+	@echo " +-------------------------------------------+"
 
 _all: app_flite.so
 
@@ -36,10 +36,10 @@ clean:
 install: _all
 	$(INSTALL) -m 755 -d $(DESTDIR)$(MODULES_DIR)
 	$(INSTALL) -m 755 app_flite.so $(DESTDIR)$(MODULES_DIR)
-	@echo " +---- app_flite Installation Complete ------+"  
+	@echo " +---- app_flite Installation Complete ------+"
 	@echo " +                                           +"
-	@echo " + app_flite has successfully been installed.+"  
-	@echo " + If you would like to install the sample   +"  
+	@echo " + app_flite has successfully been installed.+"
+	@echo " + If you would like to install the sample   +"
 	@echo " + configuration file run:                   +"
 	@echo " +                                           +"
 	@echo " +              make samples                 +"

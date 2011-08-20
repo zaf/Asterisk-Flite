@@ -1,15 +1,16 @@
 ===========================================
-         Flite For Asterisk 1.6
+           Flite For Asterisk
 ===========================================
 
 This provides the "Flite" dialplan application, which allows you to use
 the Flite TTS Engine with Asterisk. This module invokes the Flite TTS engine
 locally, and uses it to render text to speech.
+It works with asterisk versions 1.6, 1.8, 10
 
 ------------
 Requirements
 ------------
-Asterisk development header files
+Asterisk header files
 Flite libraries and header files
 
 ------------
@@ -28,14 +29,14 @@ Usage
 -----
 Flite(text[,intkeys]) This will invoke the Flite TTS engine, send a text string,
 get back the resulting waveform and play it to the user, allowing any given
-interrupt keys to immediately terminate and return the value, or 'any' to 
+interrupt keys to immediately terminate and return the value, or 'any' to
 allow any number back.
 
---------  
+--------
 Examples
 --------
 dialplan sample code for your extensions.conf
-  
+
 ;Flite Demo
 exten => 1234,1,Answer()
 exten => 1234,n,Flite("This is a simple F lite test in english.",any)
@@ -47,5 +48,5 @@ exten => 1234,n,Hangup()
 -------
 License
 -------
-The Flite module for asterisk is distributed under the GNU General Public 
+The Flite module for asterisk is distributed under the GNU General Public
 License v2. See COPYING for details.
