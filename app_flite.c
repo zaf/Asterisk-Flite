@@ -51,9 +51,9 @@ cst_voice *register_cmu_us_kal(void);
 static char *app = "Flite";
 static char *synopsis = "Say text to the user, using Flite TTS engine";
 static char *descrip =
-    "  Flite(text[,intkeys]):  This will invoke the Flite TTS engine, send a text string,\n"
-    "get back the resulting waveform and play it to the user, allowing any given interrupt\n"
-    "keys to immediately terminate and return the value, or 'any' to allow any number back.\n";
+ "  Flite(text[,intkeys]):  This will invoke the Flite TTS engine, send a text string,\n"
+ "get back the resulting waveform and play it to the user, allowing any given interrupt\n"
+ "keys to immediately terminate and return the value, or 'any' to allow any number back.\n";
 
 static int app_exec(struct ast_channel *chan, void *data)
 {
@@ -67,11 +67,14 @@ static int app_exec(struct ast_channel *chan, void *data)
 	char cachefile[MAXLEN] = "";
 	char tmp_name[22];
 	char wav_tmp_name[28];
-    int sample_rate = 8000;
+	int sample_rate = 8000;
 	cst_voice *voice;
 	struct ast_config *cfg;
 	struct ast_flags config_flags = { 0 };
-	AST_DECLARE_APP_ARGS(args, AST_APP_ARG(text); AST_APP_ARG(interrupt););
+	AST_DECLARE_APP_ARGS(args,
+		AST_APP_ARG(text);
+		AST_APP_ARG(interrupt);
+		);
 
 	if (ast_strlen_zero(data)) {
 		ast_log(LOG_ERROR, "Flite requires an argument (text)\n");
@@ -86,7 +89,7 @@ static int app_exec(struct ast_channel *chan, void *data)
 			usecache = ast_true(temp);
 		if (!(cachedir = ast_variable_retrieve(cfg, "general", "cachedir")))
 			cachedir = "/tmp";
-        if ((temp = ast_variable_retrieve(cfg, "general", "samplerate")))
+		if ((temp = ast_variable_retrieve(cfg, "general", "samplerate")))
 			sample_rate = atoi(temp);
 	}
 
@@ -95,15 +98,14 @@ static int app_exec(struct ast_channel *chan, void *data)
 
 	if (args.interrupt && !strcasecmp(args.interrupt, "any"))
 		args.interrupt = AST_DIGIT_ANY;
-    if (sample_rate != 8000 && sample_rate != 16000) {
+	if (sample_rate != 8000 && sample_rate != 16000) {
 		ast_log(LOG_WARNING,
-            "Flite: Unsupported sample rate: %d. Falling back to 8000Hz\n",
-            sample_rate);
+			"Flite: Unsupported sample rate: %d. Falling back to 8000Hz\n", sample_rate);
 		sample_rate = 8000;
 	}
 
 	ast_debug(1, "Flite:\nText passed: %s\nInterrupt key(s): %s\nRate: %d\n", args.text,
-        args.interrupt, sample_rate);
+		args.interrupt, sample_rate);
 
 	/*Cache mechanism */
 	if (usecache) {
@@ -121,7 +123,7 @@ static int app_exec(struct ast_channel *chan, void *data)
 				res = ast_streamfile(chan, cachefile, chan->language);
 				if (res) {
 					ast_log(LOG_ERROR, "Flite: ast_streamfile failed on %s\n",
-							chan->name);
+						chan->name);
 				} else {
 					res = ast_waitstream(chan, args.interrupt);
 					ast_stopstream(chan);
@@ -134,17 +136,17 @@ static int app_exec(struct ast_channel *chan, void *data)
 
 	/* Create temp filenames */
 	snprintf(tmp_name, sizeof(tmp_name), "/tmp/Flite_%li", ast_random());
-    if (sample_rate == 16000)
-        snprintf(wav_tmp_name, sizeof(wav_tmp_name), "%s.wav16", tmp_name);
-    if (sample_rate == 8000)
-        snprintf(wav_tmp_name, sizeof(wav_tmp_name), "%s.wav", tmp_name);
 
 	/* Invoke Flite */
 	flite_init();
-    if (sample_rate == 16000)
-        voice = register_cmu_us_kal16();
-    if (sample_rate == 8000)
-        voice = register_cmu_us_kal();
+	if (sample_rate == 16000) {
+		voice = register_cmu_us_kal16();
+		snprintf(wav_tmp_name, sizeof(wav_tmp_name), "%s.wav16", tmp_name);
+	}
+	if (sample_rate == 8000) {
+		voice = register_cmu_us_kal();
+		snprintf(wav_tmp_name, sizeof(wav_tmp_name), "%s.wav", tmp_name);
+	}
 	flite_text_to_speech(args.text, voice, wav_tmp_name);
 
 	/* Save file to cache if set */
