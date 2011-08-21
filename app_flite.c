@@ -134,11 +134,10 @@ static int app_exec(struct ast_channel *chan, void *data)
 
 	/* Create temp filenames */
 	snprintf(tmp_name, sizeof(tmp_name), "/tmp/Flite_%li", ast_random());
-    if (sample_rate == 16000) {
+    if (sample_rate == 16000)
         snprintf(wav_tmp_name, sizeof(wav_tmp_name), "%s.wav16", tmp_name);
-    if (sample_rate == 8000) {
+    if (sample_rate == 8000)
         snprintf(wav_tmp_name, sizeof(wav_tmp_name), "%s.wav", tmp_name);
-	}
 
 	/* Invoke Flite */
 	flite_init();
