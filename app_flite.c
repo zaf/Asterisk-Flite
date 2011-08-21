@@ -49,9 +49,7 @@ cst_voice *register_cmu_us_kal16(void);
 cst_voice *register_cmu_us_kal(void);
 
 static char *app = "Flite";
-
 static char *synopsis = "Say text to the user, using Flite TTS engine";
-
 static char *descrip =
     "  Flite(text[,intkeys]):  This will invoke the Flite TTS engine, send a text string,\n"
     "get back the resulting waveform and play it to the user, allowing any given interrupt\n"
@@ -138,12 +136,8 @@ static int app_exec(struct ast_channel *chan, void *data)
 	snprintf(tmp_name, sizeof(tmp_name), "/tmp/Flite_%li", ast_random());
     if (sample_rate == 16000) {
         snprintf(wav_tmp_name, sizeof(wav_tmp_name), "%s.wav16", tmp_name);
-    } else if (sample_rate == 8000) {
+    if (sample_rate == 8000) {
         snprintf(wav_tmp_name, sizeof(wav_tmp_name), "%s.wav", tmp_name);
-    } else {
-        ast_log(LOG_ERROR, "Flite: Unsupported sample rate '%d'\n ", sample_rate);
-		ast_config_destroy(cfg);
-		return -1;
 	}
 
 	/* Invoke Flite */
