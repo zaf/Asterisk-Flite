@@ -35,6 +35,7 @@
 
 ASTERISK_FILE_VERSION(__FILE__, "$Revision: 00 $")
 #include <stdio.h>
+#include <string.h>
 #include <flite/flite.h>
 #include "asterisk/file.h"
 #include "asterisk/channel.h"
@@ -45,36 +46,39 @@ ASTERISK_FILE_VERSION(__FILE__, "$Revision: 00 $")
 #define AST_MODULE "Flite"
 #define FLITE_CONFIG "flite.conf"
 #define MAXLEN 2048
+
+cst_voice *register_cmu_us_awb(void);
 cst_voice *register_cmu_us_kal16(void);
-cst_voice *register_cmu_us_kal(void);
+cst_voice *register_cmu_us_rms(void);
+cst_voice *register_cmu_us_slt(void);
 
 static char *app = "Flite";
 static char *synopsis = "Say text to the user, using Flite TTS engine";
 static char *descrip =
- "  Flite(text[,intkeys]):  This will invoke the Flite TTS engine, send a text string,\n"
- "get back the resulting waveform and play it to the user, allowing any given interrupt\n"
- "keys to immediately terminate and return the value, or 'any' to allow any number back.\n";
+	" Flite(text[,intkeys]): This will invoke the Flite TTS engine, send a text string,\n"
+	"get back the resulting waveform and play it to the user, allowing any given interrupt\n"
+	"keys to immediately terminate and return the value, or 'any' to allow any number back.\n";
 
-static int app_exec(struct ast_channel *chan, void *data)
+static int app_exec(struct ast_channel *chan, const char *data)
 {
 	int res = 0;
-	const char *mydata;
-	const char *cachedir = "";
+	char *mydata;
+	const char *cachedir;
 	const char *temp;
+	const char *voice_name;
 	int usecache = 0;
 	int writecache = 0;
 	char MD5_name[33] = "";
 	char cachefile[MAXLEN] = "";
 	char tmp_name[22];
 	char wav_tmp_name[28];
-	int sample_rate = 8000;
 	cst_voice *voice;
 	struct ast_config *cfg;
 	struct ast_flags config_flags = { 0 };
 	AST_DECLARE_APP_ARGS(args,
 		AST_APP_ARG(text);
 		AST_APP_ARG(interrupt);
-		);
+	);
 
 	if (ast_strlen_zero(data)) {
 		ast_log(LOG_ERROR, "Flite requires an argument (text)\n");
@@ -84,13 +88,15 @@ static int app_exec(struct ast_channel *chan, void *data)
 	cfg = ast_config_load(FLITE_CONFIG, config_flags);
 	if (!cfg) {
 		ast_log(LOG_WARNING, "Flite: No such configuration file %s\n", FLITE_CONFIG);
+		cachedir = "/tmp";
+		voice_name = "kal";
 	} else {
 		if ((temp = ast_variable_retrieve(cfg, "general", "usecache")))
 			usecache = ast_true(temp);
 		if (!(cachedir = ast_variable_retrieve(cfg, "general", "cachedir")))
 			cachedir = "/tmp";
-		if ((temp = ast_variable_retrieve(cfg, "general", "samplerate")))
-			sample_rate = atoi(temp);
+		if (!(voice_name = ast_variable_retrieve(cfg, "general", "voice")))
+			voice_name = "kal";
 	}
 
 	mydata = ast_strdupa(data);
@@ -98,14 +104,9 @@ static int app_exec(struct ast_channel *chan, void *data)
 
 	if (args.interrupt && !strcasecmp(args.interrupt, "any"))
 		args.interrupt = AST_DIGIT_ANY;
-	if (sample_rate != 8000 && sample_rate != 16000) {
-		ast_log(LOG_WARNING,
-			"Flite: Unsupported sample rate: %d. Falling back to 8000Hz\n", sample_rate);
-		sample_rate = 8000;
-	}
 
-	ast_debug(1, "Flite:\nText passed: %s\nInterrupt key(s): %s\nRate: %d\n", args.text,
-		args.interrupt, sample_rate);
+	ast_debug(1, "Flite:\nText passed: %s\nInterrupt key(s): %s\nVoice: %s\n", args.text,
+		args.interrupt, voice_name);
 
 	/*Cache mechanism */
 	if (usecache) {
@@ -122,7 +123,7 @@ static int app_exec(struct ast_channel *chan, void *data)
 					ast_answer(chan);
 				res = ast_streamfile(chan, cachefile, chan->language);
 				if (res) {
-					ast_log(LOG_ERROR, "Flite: ast_streamfile failed on %s\n",
+					ast_log(LOG_ERROR, "Flite: ast_streamfile from cache failed on %s\n",
 						chan->name);
 				} else {
 					res = ast_waitstream(chan, args.interrupt);
@@ -139,15 +140,24 @@ static int app_exec(struct ast_channel *chan, void *data)
 
 	/* Invoke Flite */
 	flite_init();
-	if (sample_rate == 16000) {
+	if (strcmp(voice_name,"kal") == 0)
 		voice = register_cmu_us_kal16();
-		snprintf(wav_tmp_name, sizeof(wav_tmp_name), "%s.wav16", tmp_name);
+	else if (strcmp(voice_name,"awb") == 0)
+		voice = register_cmu_us_awb();
+	else if (strcmp(voice_name,"rms") == 0)
+		voice = register_cmu_us_rms();
+	else if (strcmp(voice_name,"slt") == 0)
+		voice = register_cmu_us_slt();
+	else
+		voice = register_cmu_us_kal16();
+
+	snprintf(wav_tmp_name, sizeof(wav_tmp_name), "%s.wav16", tmp_name);
+	if (!(flite_text_to_speech(args.text, voice, wav_tmp_name))) {
+		ast_log(LOG_ERROR, "Flite: Failed to synthesize speech for the specified text.\n");
+		ast_filedelete(tmp_name, NULL);
+		ast_config_destroy(cfg);
+		return -1;
 	}
-	if (sample_rate == 8000) {
-		voice = register_cmu_us_kal();
-		snprintf(wav_tmp_name, sizeof(wav_tmp_name), "%s.wav", tmp_name);
-	}
-	flite_text_to_speech(args.text, voice, wav_tmp_name);
 
 	/* Save file to cache if set */
 	if (writecache) {

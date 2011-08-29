@@ -1,3 +1,7 @@
+2011-26-08 Lefteris Zafiris <zaf.000@gmail.com> - 2.1-rc1
+	Added option to choose between available flite voices.
+	Dropped support for asterisk 1.6
+
 2011-20-08 Lefteris Zafiris <zaf.000@gmail.com> - 2.0
     Added option for generating 16kHz sound files
     Labelled as stable
