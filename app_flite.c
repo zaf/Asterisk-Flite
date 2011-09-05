@@ -43,6 +43,7 @@ ASTERISK_FILE_VERSION(__FILE__, "$Revision: 00 $")
 #include "asterisk/config.h"
 #include "asterisk/app.h"
 #include "asterisk/utils.h"
+#include "asterisk/strings.h"
 #define AST_MODULE "Flite"
 #define FLITE_CONFIG "flite.conf"
 #define MAXLEN 2048
@@ -70,8 +71,8 @@ static int app_exec(struct ast_channel *chan, const char *data)
 	int writecache = 0;
 	char MD5_name[33] = "";
 	char cachefile[MAXLEN] = "";
-	char tmp_name[22];
-	char wav_tmp_name[28];
+	char tmp_name[20];
+	char wav_tmp_name[26];
 	cst_voice *voice;
 	struct ast_config *cfg;
 	struct ast_flags config_flags = { 0 };
@@ -104,6 +105,13 @@ static int app_exec(struct ast_channel *chan, const char *data)
 
 	if (args.interrupt && !strcasecmp(args.interrupt, "any"))
 		args.interrupt = AST_DIGIT_ANY;
+	
+	args.text = ast_strip_quoted(args.text, "\"", "\"");
+	if (ast_strlen_zero(args.text)) {
+		ast_log(LOG_WARNING, "Flite: No text passed for synthesis.\n");
+		ast_config_destroy(cfg);
+		return res;
+	}
 
 	ast_debug(1, "Flite:\nText passed: %s\nInterrupt key(s): %s\nVoice: %s\n", args.text,
 		args.interrupt, voice_name);
@@ -111,7 +119,7 @@ static int app_exec(struct ast_channel *chan, const char *data)
 	/*Cache mechanism */
 	if (usecache) {
 		ast_md5_hash(MD5_name, args.text);
-		if (strlen(cachedir) + strlen(MD5_name) + 5 <= MAXLEN) {
+		if (strlen(cachedir) + strlen(MD5_name) + 6 <= MAXLEN) {
 			ast_debug(1, "Flite: Activating cache mechanism...\n");
 			snprintf(cachefile, sizeof(cachefile), "%s/%s", cachedir, MD5_name);
 			if (ast_fileexists(cachefile, NULL, NULL) <= 0) {
@@ -136,7 +144,7 @@ static int app_exec(struct ast_channel *chan, const char *data)
 	}
 
 	/* Create temp filenames */
-	snprintf(tmp_name, sizeof(tmp_name), "/tmp/Flite_%li", ast_random());
+	snprintf(tmp_name, sizeof(tmp_name), "/tmp/Flite_%li", ast_random() %99999999);
 
 	/* Invoke Flite */
 	flite_init();

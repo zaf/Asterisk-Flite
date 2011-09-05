@@ -10,8 +10,8 @@ It works with asterisk versions 1.8, 10
 ------------
 Requirements
 ------------
-Asterisk header files
-Flite libraries and header files
+Asterisk 1.8 (or later) header files
+Flite 1.4 (or later) libraries and header files
 
 ------------
 Installation
