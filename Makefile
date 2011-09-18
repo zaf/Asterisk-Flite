@@ -1,11 +1,22 @@
 #
 # Makefile for Asterisk flite application
+# Copyright (C) 2009, Lefteris Zafiris
 #
+# This program is free software, distributed under the terms of
+# the GNU General Public License Version 2. See the COPYING file
+# at the top of the source tree.
 
 INSTALL=install
-ASTLIBDIR=$(INSTALL_PREFIX)/usr/lib/asterisk
+BITS=$(shell getconf LONG_BIT)
+ifeq ($(BITS),64)
+	ASTLIBDIR=$(INSTALL_PREFIX)/usr/lib64/asterisk
+else
+	ASTLIBDIR=$(INSTALL_PREFIX)/usr/lib/asterisk
+endif
 MODULES_DIR=$(ASTLIBDIR)/modules
 ASTETCDIR=$(INSTALL_PREFIX)/etc/asterisk
+SAMPLENAME=flite.conf.sample
+CONFNAME=$(basename $(SAMPLENAME))
 
 CC=gcc
 OPTIMIZE=-O2
@@ -46,23 +57,10 @@ install: _all
 	@echo " +-------------------------------------------+"
 
 samples:
-	mkdir -p $(DESTDIR)$(ASTETCDIR)
-	for x in *.sample; do \
-		if [ -f $(DESTDIR)$(ASTETCDIR)/`basename $$x .sample` ]; then \
-			if [ "$(OVERWRITE)" = "y" ]; then \
-				if cmp -s $(DESTDIR)$(ASTETCDIR)/`basename $$x .sample` $$x ; then \
-					echo "Config file $$x is unchanged"; \
-					continue; \
-				fi ; \
-				mv -f $(DESTDIR)$(ASTETCDIR)/`basename $$x .sample` $(DESTDIR)$(ASTETCDIR)/`basename $$x .sample`.old ; \
-			else \
-				echo "Skipping config file $$x"; \
-				continue; \
-			fi ;\
-		fi ; \
-		$(INSTALL) -m 644 $$x $(DESTDIR)$(ASTETCDIR)/`basename $$x .sample` ;\
-	done
-
-ifneq ($(wildcard .*.d),)
-   include .*.d
-endif
+	@mkdir -p $(DESTDIR)$(ASTETCDIR)
+	@if [ -f $(DESTDIR)$(ASTETCDIR)/$(CONFNAME) ]; then \
+		echo "Backing up previous config file as $(CONFNAME).old";\
+		mv -f $(DESTDIR)$(ASTETCDIR)/$(CONFNAME) $(DESTDIR)$(ASTETCDIR)/$(CONFNAME).old ; \
+	fi ;
+	$(INSTALL) -m 644 $(SAMPLENAME) $(DESTDIR)$(ASTETCDIR)/$(CONFNAME)
+	@echo " ------- app_flite confing Installed ---------"
