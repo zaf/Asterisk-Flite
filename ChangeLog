@@ -1,6 +1,11 @@
+2011-20-09 Lefteris Zafiris <zaf.000@gmail.com> - 2.1-rc2
+	Changed output file format to sln16 (16bit signed linear
+	PCM at 16000Hz). Added back support for asterisk 1.6 and
+	8000Hz sound files.
+
 2011-26-08 Lefteris Zafiris <zaf.000@gmail.com> - 2.1-rc1
 	Added option to choose between available flite voices.
-	Dropped support for asterisk 1.6
+	Dropped support for asterisk 1.6 and 8000Hz sound files
 
 2011-20-08 Lefteris Zafiris <zaf.000@gmail.com> - 2.0
     Added option for generating 16kHz sound files

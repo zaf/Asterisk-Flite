@@ -1,7 +1,7 @@
 /*
  * Asterisk -- An open source telephony toolkit.
  *
- * Copyright (C) 2009, Lefteris Zafiris
+ * Copyright (C) 2009 - 2011, Lefteris Zafiris
  *
  * Lefteris Zafiris <zaf.000@gmail.com>
  *
@@ -70,9 +70,12 @@ static int app_exec(struct ast_channel *chan, const char *data)
 	int usecache = 0;
 	int writecache = 0;
 	char MD5_name[33] = "";
+	int sample_rate;
+	int target_sample_rate;
 	char cachefile[MAXLEN] = "";
 	char tmp_name[20];
-	char wav_tmp_name[26];
+	char raw_tmp_name[26];
+	cst_wave *raw_data;
 	cst_voice *voice;
 	struct ast_config *cfg;
 	struct ast_flags config_flags = { 0 };
@@ -91,6 +94,7 @@ static int app_exec(struct ast_channel *chan, const char *data)
 		ast_log(LOG_WARNING, "Flite: No such configuration file %s\n", FLITE_CONFIG);
 		cachedir = "/tmp";
 		voice_name = "kal";
+		target_sample_rate = 16000;
 	} else {
 		if ((temp = ast_variable_retrieve(cfg, "general", "usecache")))
 			usecache = ast_true(temp);
@@ -98,6 +102,11 @@ static int app_exec(struct ast_channel *chan, const char *data)
 			cachedir = "/tmp";
 		if (!(voice_name = ast_variable_retrieve(cfg, "general", "voice")))
 			voice_name = "kal";
+		if (!(temp = ast_variable_retrieve(cfg, "general", "samplerate"))) {
+			target_sample_rate = 16000;
+		} else {
+			target_sample_rate = atoi(temp);
+		}
 	}
 
 	mydata = ast_strdupa(data);
@@ -111,6 +120,11 @@ static int app_exec(struct ast_channel *chan, const char *data)
 		ast_log(LOG_WARNING, "Flite: No text passed for synthesis.\n");
 		ast_config_destroy(cfg);
 		return res;
+	}
+	
+	if (target_sample_rate != 8000 && target_sample_rate != 16000) {
+		ast_log(LOG_WARNING, "Flite: Unsupported sample rate: %d. Falling back to 16000Hz\n", target_sample_rate);
+		target_sample_rate = 16000;
 	}
 
 	ast_debug(1, "Flite:\nText passed: %s\nInterrupt key(s): %s\nVoice: %s\n", args.text,
@@ -144,7 +158,11 @@ static int app_exec(struct ast_channel *chan, const char *data)
 	}
 
 	/* Create temp filenames */
-	snprintf(tmp_name, sizeof(tmp_name), "/tmp/Flite_%li", ast_random() %99999999);
+	snprintf(tmp_name, sizeof(tmp_name), "/tmp/flite_%li", ast_random() %99999999);
+	if (target_sample_rate == 16000)
+		snprintf(raw_tmp_name, sizeof(raw_tmp_name), "%s.sln16", tmp_name);
+	if (target_sample_rate == 8000)
+		snprintf(raw_tmp_name, sizeof(raw_tmp_name), "%s.sln", tmp_name);
 
 	/* Invoke Flite */
 	flite_init();
@@ -158,15 +176,22 @@ static int app_exec(struct ast_channel *chan, const char *data)
 		voice = register_cmu_us_slt();
 	else
 		voice = register_cmu_us_kal16();
+	
+	raw_data = flite_text_to_wave(args.text, voice);
+	sample_rate = raw_data->sample_rate;
 
-	snprintf(wav_tmp_name, sizeof(wav_tmp_name), "%s.wav16", tmp_name);
-	if (!(flite_text_to_speech(args.text, voice, wav_tmp_name))) {
-		ast_log(LOG_ERROR, "Flite: Failed to synthesize speech for the specified text.\n");
-		ast_filedelete(tmp_name, NULL);
+	/* Resample if needed */
+	if (sample_rate != target_sample_rate)
+		cst_wave_resample(raw_data, target_sample_rate);
+
+	res = cst_wave_save_raw(raw_data, raw_tmp_name);
+	delete_wave(raw_data);
+	if (res) {
+		ast_log(LOG_ERROR, "Flite: failed to write file %s\n", raw_tmp_name);
 		ast_config_destroy(cfg);
-		return -1;
+		return res;
 	}
-
+	
 	/* Save file to cache if set */
 	if (writecache) {
 		ast_debug(1, "Flite: Saving cache file %s\n", cachefile);
