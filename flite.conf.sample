@@ -25,10 +25,10 @@
 ;
 ;voice=kal
 ;
-; Target sample rate for the generated sound files in Hz (default is 16000)
+; Target sample rate for the generated sound files in Hz (default is 8000)
 ; For now app_flite supports generation of 8000Hz or 16000Hz sound files
 ; so possible values are only 8000 and 16000. If set to another value it will
-; automatically fall back to 16000Hz.
+; automatically fall back to 8000Hz.
 ;
 ;samplerate=16000
 ;

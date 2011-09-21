@@ -44,9 +44,13 @@ ASTERISK_FILE_VERSION(__FILE__, "$Revision: 00 $")
 #include "asterisk/app.h"
 #include "asterisk/utils.h"
 #include "asterisk/strings.h"
+
 #define AST_MODULE "Flite"
 #define FLITE_CONFIG "flite.conf"
 #define MAXLEN 2048
+#define DEF_RATE 8000
+#define DEF_VOICE "kal"
+#define DEF_DIR "/tmp"
 
 cst_voice *register_cmu_us_awb(void);
 cst_voice *register_cmu_us_kal16(void);
@@ -60,18 +64,18 @@ static char *descrip =
 	"get back the resulting waveform and play it to the user, allowing any given interrupt\n"
 	"keys to immediately terminate and return the value, or 'any' to allow any number back.\n";
 
-static int app_exec(struct ast_channel *chan, const char *data)
+static int flite_exec(struct ast_channel *chan, const char *data)
 {
 	int res = 0;
 	char *mydata;
-	const char *cachedir;
+	const char *cachedir = DEF_DIR;
 	const char *temp;
-	const char *voice_name;
+	const char *voice_name = DEF_VOICE;
 	int usecache = 0;
 	int writecache = 0;
 	char MD5_name[33] = "";
 	int sample_rate;
-	int target_sample_rate;
+	int target_sample_rate = DEF_RATE;
 	char cachefile[MAXLEN] = "";
 	char tmp_name[20];
 	char raw_tmp_name[26];
@@ -90,23 +94,22 @@ static int app_exec(struct ast_channel *chan, const char *data)
 	}
 
 	cfg = ast_config_load(FLITE_CONFIG, config_flags);
-	if (!cfg) {
-		ast_log(LOG_WARNING, "Flite: No such configuration file %s\n", FLITE_CONFIG);
-		cachedir = "/tmp";
-		voice_name = "kal";
-		target_sample_rate = 16000;
+	if (!cfg || cfg == CONFIG_STATUS_FILEINVALID) {
+		ast_log(LOG_WARNING,
+				"Flite: Unable to read config file %s. Using default settings\n",
+				FLITE_CONFIG);
 	} else {
 		if ((temp = ast_variable_retrieve(cfg, "general", "usecache")))
 			usecache = ast_true(temp);
-		if (!(cachedir = ast_variable_retrieve(cfg, "general", "cachedir")))
-			cachedir = "/tmp";
-		if (!(voice_name = ast_variable_retrieve(cfg, "general", "voice")))
-			voice_name = "kal";
-		if (!(temp = ast_variable_retrieve(cfg, "general", "samplerate"))) {
-			target_sample_rate = 16000;
-		} else {
+
+		if ((temp = ast_variable_retrieve(cfg, "general", "cachedir")))
+			cachedir = temp;
+
+		if ((temp = ast_variable_retrieve(cfg, "general", "voice")))
+			voice_name = temp;
+
+		if ((temp = ast_variable_retrieve(cfg, "general", "samplerate")))
 			target_sample_rate = atoi(temp);
-		}
 	}
 
 	mydata = ast_strdupa(data);
@@ -114,21 +117,22 @@ static int app_exec(struct ast_channel *chan, const char *data)
 
 	if (args.interrupt && !strcasecmp(args.interrupt, "any"))
 		args.interrupt = AST_DIGIT_ANY;
-	
+
 	args.text = ast_strip_quoted(args.text, "\"", "\"");
 	if (ast_strlen_zero(args.text)) {
 		ast_log(LOG_WARNING, "Flite: No text passed for synthesis.\n");
 		ast_config_destroy(cfg);
 		return res;
 	}
-	
+
 	if (target_sample_rate != 8000 && target_sample_rate != 16000) {
-		ast_log(LOG_WARNING, "Flite: Unsupported sample rate: %d. Falling back to 16000Hz\n", target_sample_rate);
-		target_sample_rate = 16000;
+		ast_log(LOG_WARNING, "Flite: Unsupported sample rate: %d. Falling back to %d\n",
+				target_sample_rate, DEF_RATE);
+		target_sample_rate = DEF_RATE;
 	}
 
 	ast_debug(1, "Flite:\nText passed: %s\nInterrupt key(s): %s\nVoice: %s\n", args.text,
-		args.interrupt, voice_name);
+			  args.interrupt, voice_name);
 
 	/*Cache mechanism */
 	if (usecache) {
@@ -146,7 +150,7 @@ static int app_exec(struct ast_channel *chan, const char *data)
 				res = ast_streamfile(chan, cachefile, chan->language);
 				if (res) {
 					ast_log(LOG_ERROR, "Flite: ast_streamfile from cache failed on %s\n",
-						chan->name);
+							chan->name);
 				} else {
 					res = ast_waitstream(chan, args.interrupt);
 					ast_stopstream(chan);
@@ -159,24 +163,27 @@ static int app_exec(struct ast_channel *chan, const char *data)
 
 	/* Create temp filenames */
 	snprintf(tmp_name, sizeof(tmp_name), "/tmp/flite_%li", ast_random() %99999999);
-	if (target_sample_rate == 16000)
-		snprintf(raw_tmp_name, sizeof(raw_tmp_name), "%s.sln16", tmp_name);
 	if (target_sample_rate == 8000)
 		snprintf(raw_tmp_name, sizeof(raw_tmp_name), "%s.sln", tmp_name);
+	if (target_sample_rate == 16000)
+		snprintf(raw_tmp_name, sizeof(raw_tmp_name), "%s.sln16", tmp_name);
 
 	/* Invoke Flite */
 	flite_init();
-	if (strcmp(voice_name,"kal") == 0)
+	if (strcmp(voice_name, "kal") == 0)
 		voice = register_cmu_us_kal16();
-	else if (strcmp(voice_name,"awb") == 0)
+	else if (strcmp(voice_name, "awb") == 0)
 		voice = register_cmu_us_awb();
-	else if (strcmp(voice_name,"rms") == 0)
+	else if (strcmp(voice_name, "rms") == 0)
 		voice = register_cmu_us_rms();
-	else if (strcmp(voice_name,"slt") == 0)
+	else if (strcmp(voice_name, "slt") == 0)
 		voice = register_cmu_us_slt();
-	else
+	else {
+		ast_log(LOG_WARNING, "Flite: Unsupported voice %s. Using default male voice.\n",
+				voice_name);
 		voice = register_cmu_us_kal16();
-	
+	}
+
 	raw_data = flite_text_to_wave(args.text, voice);
 	sample_rate = raw_data->sample_rate;
 
@@ -191,7 +198,7 @@ static int app_exec(struct ast_channel *chan, const char *data)
 		ast_config_destroy(cfg);
 		return res;
 	}
-	
+
 	/* Save file to cache if set */
 	if (writecache) {
 		ast_debug(1, "Flite: Saving cache file %s\n", cachefile);
@@ -220,7 +227,7 @@ static int unload_module(void)
 
 static int load_module(void)
 {
-	return ast_register_application(app, app_exec, synopsis, descrip) ?
+	return ast_register_application(app, flite_exec, synopsis, descrip) ?
 		AST_MODULE_LOAD_DECLINE : AST_MODULE_LOAD_SUCCESS;
 }
 
