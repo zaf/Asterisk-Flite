@@ -53,9 +53,16 @@ ASTERISK_FILE_VERSION(__FILE__, "$Revision: 00 $")
 #define DEF_DIR "/tmp"
 
 cst_voice *register_cmu_us_awb(void);
+void unregister_cmu_us_awb(cst_voice *v);
+
 cst_voice *register_cmu_us_kal16(void);
+void unregister_cmu_us_kal16(cst_voice *v);
+
 cst_voice *register_cmu_us_rms(void);
+void unregister_cmu_us_rms(cst_voice *v);
+
 cst_voice *register_cmu_us_slt(void);
+void unregister_cmu_us_slt(cst_voice *v);
 
 static char *app = "Flite";
 static char *synopsis = "Say text to the user, using Flite TTS engine";
@@ -131,8 +138,8 @@ static int flite_exec(struct ast_channel *chan, const char *data)
 		target_sample_rate = DEF_RATE;
 	}
 
-	ast_debug(1, "Flite:\nText passed: %s\nInterrupt key(s): %s\nVoice: %s\n", args.text,
-			  args.interrupt, voice_name);
+	ast_debug(1, "Flite:\nText passed: %s\nInterrupt key(s): %s\nVoice: %s\nRate: %d\n",
+			args.text, args.interrupt, voice_name, target_sample_rate);
 
 	/*Cache mechanism */
 	if (usecache) {
@@ -193,6 +200,15 @@ static int flite_exec(struct ast_channel *chan, const char *data)
 
 	res = cst_wave_save_raw(raw_data, raw_tmp_name);
 	delete_wave(raw_data);
+	if (strcmp(voice_name, "awb") == 0)
+		unregister_cmu_us_awb(voice);
+	else if (strcmp(voice_name, "rms") == 0)
+		unregister_cmu_us_rms(voice);
+	else if (strcmp(voice_name, "slt") == 0)
+		unregister_cmu_us_slt(voice);
+	else
+		unregister_cmu_us_kal16(voice);
+
 	if (res) {
 		ast_log(LOG_ERROR, "Flite: failed to write file %s\n", raw_tmp_name);
 		ast_config_destroy(cfg);

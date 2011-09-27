@@ -5,12 +5,12 @@
 This provides the "Flite" dialplan application, which allows you to use
 the Flite TTS Engine with Asterisk. This module invokes the Flite TTS engine
 locally, and uses it to render text to speech.
-It works with asterisk versions 1.8, 10
+It works with asterisk versions 1.6.x, 1.8, 10
 
 ------------
 Requirements
 ------------
-Asterisk 1.8 (or later) header files
+Asterisk 1.6.1 (or later) header files
 Flite 1.4 (or later) libraries and header files
 
 ------------
