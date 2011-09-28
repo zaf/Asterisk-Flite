@@ -15,20 +15,3 @@
 ;
 ;cachedir=/var/lib/asterisk/flitecache/
 ;
-; Voice name (defaults to kal)
-; 
-; Available voices (for flite 1.4):
-;	kal (American male)
-;	rms (American male)
-;	awb (Scottish male)
-;	slt (American female)
-;
-;voice=kal
-;
-; Target sample rate for the generated sound files in Hz (default is 8000)
-; For now app_flite supports generation of 8000Hz or 16000Hz sound files
-; so possible values are only 8000 and 16000. If set to another value it will
-; automatically fall back to 8000Hz.
-;
-;samplerate=16000
-;

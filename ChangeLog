@@ -1,3 +1,8 @@
+2011-29-09 Lefteris Zafiris <zaf.000@gmail.com> - 2.1-flite-1.3
+	New branch compatible with older version of flite (v 1.3)
+	This version doesn not support generation of 16kHz sound
+	files or choice of voices.
+
 2011-20-09 Lefteris Zafiris <zaf.000@gmail.com> - 2.1-rc2
 	Changed output file format to sln16 (16bit signed linear
 	PCM at 16000Hz). Added back support for asterisk 1.6 and

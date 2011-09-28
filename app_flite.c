@@ -48,21 +48,10 @@ ASTERISK_FILE_VERSION(__FILE__, "$Revision: 00 $")
 #define AST_MODULE "Flite"
 #define FLITE_CONFIG "flite.conf"
 #define MAXLEN 2048
-#define DEF_RATE 8000
-#define DEF_VOICE "kal"
 #define DEF_DIR "/tmp"
 
-cst_voice *register_cmu_us_awb(void);
-void unregister_cmu_us_awb(cst_voice *v);
-
-cst_voice *register_cmu_us_kal16(void);
-void unregister_cmu_us_kal16(cst_voice *v);
-
-cst_voice *register_cmu_us_rms(void);
-void unregister_cmu_us_rms(cst_voice *v);
-
-cst_voice *register_cmu_us_slt(void);
-void unregister_cmu_us_slt(cst_voice *v);
+cst_voice *register_cmu_us_kal(void);
+void unregister_cmu_us_kal(cst_voice *v);
 
 static char *app = "Flite";
 static char *synopsis = "Say text to the user, using Flite TTS engine";
@@ -77,12 +66,9 @@ static int flite_exec(struct ast_channel *chan, const char *data)
 	char *mydata;
 	const char *cachedir = DEF_DIR;
 	const char *temp;
-	const char *voice_name = DEF_VOICE;
 	int usecache = 0;
 	int writecache = 0;
 	char MD5_name[33] = "";
-	int sample_rate;
-	int target_sample_rate = DEF_RATE;
 	char cachefile[MAXLEN] = "";
 	char tmp_name[20];
 	char raw_tmp_name[26];
@@ -111,12 +97,6 @@ static int flite_exec(struct ast_channel *chan, const char *data)
 
 		if ((temp = ast_variable_retrieve(cfg, "general", "cachedir")))
 			cachedir = temp;
-
-		if ((temp = ast_variable_retrieve(cfg, "general", "voice")))
-			voice_name = temp;
-
-		if ((temp = ast_variable_retrieve(cfg, "general", "samplerate")))
-			target_sample_rate = atoi(temp);
 	}
 
 	mydata = ast_strdupa(data);
@@ -132,14 +112,7 @@ static int flite_exec(struct ast_channel *chan, const char *data)
 		return res;
 	}
 
-	if (target_sample_rate != 8000 && target_sample_rate != 16000) {
-		ast_log(LOG_WARNING, "Flite: Unsupported sample rate: %d. Falling back to %d\n",
-				target_sample_rate, DEF_RATE);
-		target_sample_rate = DEF_RATE;
-	}
-
-	ast_debug(1, "Flite:\nText passed: %s\nInterrupt key(s): %s\nVoice: %s\nRate: %d\n",
-			args.text, args.interrupt, voice_name, target_sample_rate);
+	ast_debug(1, "Flite:\nText passed: %s\nInterrupt key(s): %s\n", args.text, args.interrupt);
 
 	/*Cache mechanism */
 	if (usecache) {
@@ -170,45 +143,15 @@ static int flite_exec(struct ast_channel *chan, const char *data)
 
 	/* Create temp filenames */
 	snprintf(tmp_name, sizeof(tmp_name), "/tmp/flite_%li", ast_random() %99999999);
-	if (target_sample_rate == 8000)
-		snprintf(raw_tmp_name, sizeof(raw_tmp_name), "%s.sln", tmp_name);
-	if (target_sample_rate == 16000)
-		snprintf(raw_tmp_name, sizeof(raw_tmp_name), "%s.sln16", tmp_name);
+	snprintf(raw_tmp_name, sizeof(raw_tmp_name), "%s.sln", tmp_name);
 
 	/* Invoke Flite */
 	flite_init();
-	if (strcmp(voice_name, "kal") == 0)
-		voice = register_cmu_us_kal16();
-	else if (strcmp(voice_name, "awb") == 0)
-		voice = register_cmu_us_awb();
-	else if (strcmp(voice_name, "rms") == 0)
-		voice = register_cmu_us_rms();
-	else if (strcmp(voice_name, "slt") == 0)
-		voice = register_cmu_us_slt();
-	else {
-		ast_log(LOG_WARNING, "Flite: Unsupported voice %s. Using default male voice.\n",
-				voice_name);
-		voice = register_cmu_us_kal16();
-	}
-
+	voice = register_cmu_us_kal();
 	raw_data = flite_text_to_wave(args.text, voice);
-	sample_rate = raw_data->sample_rate;
-
-	/* Resample if needed */
-	if (sample_rate != target_sample_rate)
-		cst_wave_resample(raw_data, target_sample_rate);
-
 	res = cst_wave_save_raw(raw_data, raw_tmp_name);
 	delete_wave(raw_data);
-	if (strcmp(voice_name, "awb") == 0)
-		unregister_cmu_us_awb(voice);
-	else if (strcmp(voice_name, "rms") == 0)
-		unregister_cmu_us_rms(voice);
-	else if (strcmp(voice_name, "slt") == 0)
-		unregister_cmu_us_slt(voice);
-	else
-		unregister_cmu_us_kal16(voice);
-
+	unregister_cmu_us_kal(voice);
 	if (res) {
 		ast_log(LOG_ERROR, "Flite: failed to write file %s\n", raw_tmp_name);
 		ast_config_destroy(cfg);
