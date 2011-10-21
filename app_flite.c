@@ -71,34 +71,21 @@ static char *descrip =
 	"get back the resulting waveform and play it to the user, allowing any given interrupt\n"
 	"keys to immediately terminate and return the value, or 'any' to allow any number back.\n";
 
-static int flite_exec(struct ast_channel *chan, const char *data)
-{
-	int res = 0;
-	char *mydata;
-	const char *cachedir = DEF_DIR;
-	const char *temp;
-	const char *voice_name = DEF_VOICE;
-	int usecache = 0;
-	int writecache = 0;
-	char MD5_name[33] = "";
-	int sample_rate;
-	int target_sample_rate = DEF_RATE;
-	char cachefile[MAXLEN] = "";
-	char tmp_name[20];
-	char raw_tmp_name[26];
-	cst_wave *raw_data;
-	cst_voice *voice;
-	struct ast_config *cfg;
-	struct ast_flags config_flags = { 0 };
-	AST_DECLARE_APP_ARGS(args,
-		AST_APP_ARG(text);
-		AST_APP_ARG(interrupt);
-	);
+static int target_sample_rate;
+static int usecache;
+static const char *cachedir;
+static const char *voice_name;
+static struct ast_config *cfg;
+static struct ast_flags config_flags =  { 0 };
 
-	if (ast_strlen_zero(data)) {
-		ast_log(LOG_ERROR, "Flite requires an argument (text)\n");
-		return -1;
-	}
+static int read_config(void)
+{
+	const char *temp;
+	/* set default values */
+	target_sample_rate = DEF_RATE;
+	usecache = 0;
+	cachedir = DEF_DIR;
+	voice_name = DEF_VOICE;
 
 	cfg = ast_config_load(FLITE_CONFIG, config_flags);
 	if (!cfg || cfg == CONFIG_STATUS_FILEINVALID) {
@@ -118,6 +105,36 @@ static int flite_exec(struct ast_channel *chan, const char *data)
 		if ((temp = ast_variable_retrieve(cfg, "general", "samplerate")))
 			target_sample_rate = atoi(temp);
 	}
+	
+	if (target_sample_rate != 8000 && target_sample_rate != 16000) {
+		ast_log(LOG_WARNING, "Flite: Unsupported sample rate: %d. Falling back to %d\n",
+				target_sample_rate, DEF_RATE);
+		target_sample_rate = DEF_RATE;
+	}
+	return 0;
+}
+
+static int flite_exec(struct ast_channel *chan, const char *data)
+{
+	int res = 0;
+	char *mydata;
+	int writecache = 0;
+	char MD5_name[33] = "";
+	int sample_rate;
+	char cachefile[MAXLEN] = "";
+	char tmp_name[20];
+	char raw_tmp_name[26];
+	cst_wave *raw_data;
+	cst_voice *voice;
+	AST_DECLARE_APP_ARGS(args,
+		AST_APP_ARG(text);
+		AST_APP_ARG(interrupt);
+	);
+
+	if (ast_strlen_zero(data)) {
+		ast_log(LOG_ERROR, "Flite requires an argument (text)\n");
+		return -1;
+	}
 
 	mydata = ast_strdupa(data);
 	AST_STANDARD_APP_ARGS(args, mydata);
@@ -128,14 +145,7 @@ static int flite_exec(struct ast_channel *chan, const char *data)
 	args.text = ast_strip_quoted(args.text, "\"", "\"");
 	if (ast_strlen_zero(args.text)) {
 		ast_log(LOG_WARNING, "Flite: No text passed for synthesis.\n");
-		ast_config_destroy(cfg);
 		return res;
-	}
-
-	if (target_sample_rate != 8000 && target_sample_rate != 16000) {
-		ast_log(LOG_WARNING, "Flite: Unsupported sample rate: %d. Falling back to %d\n",
-				target_sample_rate, DEF_RATE);
-		target_sample_rate = DEF_RATE;
 	}
 
 	ast_debug(1, "Flite:\nText passed: %s\nInterrupt key(s): %s\nVoice: %s\nRate: %d\n",
@@ -161,7 +171,6 @@ static int flite_exec(struct ast_channel *chan, const char *data)
 				} else {
 					res = ast_waitstream(chan, args.interrupt);
 					ast_stopstream(chan);
-					ast_config_destroy(cfg);
 					return res;
 				}
 			}
@@ -211,7 +220,6 @@ static int flite_exec(struct ast_channel *chan, const char *data)
 
 	if (res) {
 		ast_log(LOG_ERROR, "Flite: failed to write file %s\n", raw_tmp_name);
-		ast_config_destroy(cfg);
 		return res;
 	}
 
@@ -232,19 +240,31 @@ static int flite_exec(struct ast_channel *chan, const char *data)
 	}
 
 	ast_filedelete(tmp_name, NULL);
-	ast_config_destroy(cfg);
 	return res;
+}
+
+static int reload(void)
+{
+	ast_config_destroy(cfg);
+	read_config();
+	return 0;
 }
 
 static int unload_module(void)
 {
+	ast_config_destroy(cfg);
 	return ast_unregister_application(app);
 }
 
 static int load_module(void)
 {
+	read_config();
 	return ast_register_application(app, flite_exec, synopsis, descrip) ?
 		AST_MODULE_LOAD_DECLINE : AST_MODULE_LOAD_SUCCESS;
 }
 
-AST_MODULE_INFO_STANDARD(ASTERISK_GPL_KEY, "Flite TTS Interface");
+AST_MODULE_INFO(ASTERISK_GPL_KEY, AST_MODFLAG_DEFAULT, "eSpeak TTS Interface",
+		.load = load_module,
+		.unload = unload_module,
+		.reload = reload,
+			);

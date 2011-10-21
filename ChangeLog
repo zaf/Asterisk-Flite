@@ -1,3 +1,8 @@
+2011-21-10 Lefteris Zafiris <zaf.000@gmail.com> - 2.1-rc3
+	Changed config file handling. Config values are
+	read once during module loading. Added option for
+	module reload that re-reads the config values.
+
 2011-20-09 Lefteris Zafiris <zaf.000@gmail.com> - 2.1-rc2
 	Changed output file format to sln16 (16bit signed linear
 	PCM at 16000Hz). Added back support for asterisk 1.6 and
