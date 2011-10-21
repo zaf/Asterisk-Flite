@@ -62,11 +62,11 @@ static char *descrip =
 
 static const char *cachedir;
 static int usecache;
+static struct ast_config *cfg;
+static struct ast_flags config_flags = { 0 };
 
 static int read_config(void)
 {
-	struct ast_config *cfg;
-	struct ast_flags config_flags = { 0 };
 	const char *temp;
 	/* Setting default values */
 	usecache = 0;
@@ -84,7 +84,6 @@ static int read_config(void)
 		if ((temp = ast_variable_retrieve(cfg, "general", "cachedir")))
 			cachedir = temp;
 	}
-	ast_config_destroy(cfg);
 	return 0;
 }
 static int flite_exec(struct ast_channel *chan, const char *data)
@@ -182,8 +181,16 @@ static int flite_exec(struct ast_channel *chan, const char *data)
 	return res;
 }
 
+static int reload(void)
+{
+	ast_config_destroy(cfg);
+	read_config();
+	return 0;
+}
+
 static int unload_module(void)
 {
+	ast_config_destroy(cfg);
 	return ast_unregister_application(app);
 }
 
@@ -197,5 +204,5 @@ static int load_module(void)
 AST_MODULE_INFO(ASTERISK_GPL_KEY, AST_MODFLAG_DEFAULT, "Flite TTS Interface",
 		.load = load_module,
 		.unload = unload_module,
-		.reload = read_config,
+		.reload = reload,
 			);
