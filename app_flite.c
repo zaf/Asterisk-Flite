@@ -60,32 +60,18 @@ static char *descrip =
 	"get back the resulting waveform and play it to the user, allowing any given interrupt\n"
 	"keys to immediately terminate and return the value, or 'any' to allow any number back.\n";
 
-static int flite_exec(struct ast_channel *chan, const char *data)
+static const char *cachedir;
+static int usecache;
+
+static int read_config(void)
 {
-	int res = 0;
-	char *mydata;
-	const char *cachedir = DEF_DIR;
-	const char *temp;
-	int usecache = 0;
-	int writecache = 0;
-	char MD5_name[33] = "";
-	char cachefile[MAXLEN] = "";
-	char tmp_name[20];
-	char raw_tmp_name[26];
-	cst_wave *raw_data;
-	cst_voice *voice;
 	struct ast_config *cfg;
 	struct ast_flags config_flags = { 0 };
-	AST_DECLARE_APP_ARGS(args,
-		AST_APP_ARG(text);
-		AST_APP_ARG(interrupt);
-	);
-
-	if (ast_strlen_zero(data)) {
-		ast_log(LOG_ERROR, "Flite requires an argument (text)\n");
-		return -1;
-	}
-
+	const char *temp;
+	/* Setting default values */
+	usecache = 0;
+	cachedir = DEF_DIR;
+	
 	cfg = ast_config_load(FLITE_CONFIG, config_flags);
 	if (!cfg || cfg == CONFIG_STATUS_FILEINVALID) {
 		ast_log(LOG_WARNING,
@@ -98,6 +84,29 @@ static int flite_exec(struct ast_channel *chan, const char *data)
 		if ((temp = ast_variable_retrieve(cfg, "general", "cachedir")))
 			cachedir = temp;
 	}
+	ast_config_destroy(cfg);
+	return 0;
+}
+static int flite_exec(struct ast_channel *chan, const char *data)
+{
+	int res = 0;
+	char *mydata;
+	int writecache = 0;
+	char MD5_name[33] = "";
+	char cachefile[MAXLEN] = "";
+	char tmp_name[20];
+	char raw_tmp_name[26];
+	cst_wave *raw_data;
+	cst_voice *voice;
+	AST_DECLARE_APP_ARGS(args,
+		AST_APP_ARG(text);
+		AST_APP_ARG(interrupt);
+	);
+
+	if (ast_strlen_zero(data)) {
+		ast_log(LOG_ERROR, "Flite requires an argument (text)\n");
+		return -1;
+	}
 
 	mydata = ast_strdupa(data);
 	AST_STANDARD_APP_ARGS(args, mydata);
@@ -108,7 +117,6 @@ static int flite_exec(struct ast_channel *chan, const char *data)
 	args.text = ast_strip_quoted(args.text, "\"", "\"");
 	if (ast_strlen_zero(args.text)) {
 		ast_log(LOG_WARNING, "Flite: No text passed for synthesis.\n");
-		ast_config_destroy(cfg);
 		return res;
 	}
 
@@ -134,7 +142,6 @@ static int flite_exec(struct ast_channel *chan, const char *data)
 				} else {
 					res = ast_waitstream(chan, args.interrupt);
 					ast_stopstream(chan);
-					ast_config_destroy(cfg);
 					return res;
 				}
 			}
@@ -154,10 +161,8 @@ static int flite_exec(struct ast_channel *chan, const char *data)
 	unregister_cmu_us_kal(voice);
 	if (res) {
 		ast_log(LOG_ERROR, "Flite: failed to write file %s\n", raw_tmp_name);
-		ast_config_destroy(cfg);
 		return res;
 	}
-
 	/* Save file to cache if set */
 	if (writecache) {
 		ast_debug(1, "Flite: Saving cache file %s\n", cachefile);
@@ -173,9 +178,7 @@ static int flite_exec(struct ast_channel *chan, const char *data)
 		res = ast_waitstream(chan, args.interrupt);
 		ast_stopstream(chan);
 	}
-
 	ast_filedelete(tmp_name, NULL);
-	ast_config_destroy(cfg);
 	return res;
 }
 
@@ -186,8 +189,13 @@ static int unload_module(void)
 
 static int load_module(void)
 {
+	read_config();
 	return ast_register_application(app, flite_exec, synopsis, descrip) ?
 		AST_MODULE_LOAD_DECLINE : AST_MODULE_LOAD_SUCCESS;
 }
 
-AST_MODULE_INFO_STANDARD(ASTERISK_GPL_KEY, "Flite TTS Interface");
+AST_MODULE_INFO(ASTERISK_GPL_KEY, AST_MODFLAG_DEFAULT, "Flite TTS Interface",
+		.load = load_module,
+		.unload = unload_module,
+		.reload = read_config,
+			);
