@@ -55,6 +55,9 @@ ASTERISK_FILE_VERSION(__FILE__, "$Revision: 00 $")
 cst_voice *register_cmu_us_awb(void);
 void unregister_cmu_us_awb(cst_voice *v);
 
+cst_voice *register_cmu_us_kal(void);
+void unregister_cmu_us_kal(cst_voice *v);
+
 cst_voice *register_cmu_us_kal16(void);
 void unregister_cmu_us_kal16(cst_voice *v);
 
@@ -186,7 +189,9 @@ static int flite_exec(struct ast_channel *chan, const char *data)
 
 	/* Invoke Flite */
 	flite_init();
-	if (strcmp(voice_name, "kal") == 0)
+	if (strcmp(voice_name, "kal") == 0 && target_sample_rate == 8000)
+		voice = register_cmu_us_kal();
+	else if (strcmp(voice_name, "kal") == 0 && target_sample_rate == 16000)
 		voice = register_cmu_us_kal16();
 	else if (strcmp(voice_name, "awb") == 0)
 		voice = register_cmu_us_awb();
@@ -197,7 +202,7 @@ static int flite_exec(struct ast_channel *chan, const char *data)
 	else {
 		ast_log(LOG_WARNING, "Flite: Unsupported voice %s. Using default male voice.\n",
 				voice_name);
-		voice = register_cmu_us_kal16();
+		voice = register_cmu_us_kal();
 	}
 
 	raw_data = flite_text_to_wave(args.text, voice);
@@ -215,8 +220,10 @@ static int flite_exec(struct ast_channel *chan, const char *data)
 		unregister_cmu_us_rms(voice);
 	else if (strcmp(voice_name, "slt") == 0)
 		unregister_cmu_us_slt(voice);
-	else
+	else if (strcmp(voice_name, "kal") == 0 && target_sample_rate == 16000)
 		unregister_cmu_us_kal16(voice);
+	else
+		unregister_cmu_us_kal(voice);
 
 	if (res) {
 		ast_log(LOG_ERROR, "Flite: failed to write file %s\n", raw_tmp_name);

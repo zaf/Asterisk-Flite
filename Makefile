@@ -7,13 +7,12 @@
 # at the top of the source tree.
 
 INSTALL=install
-BITS=$(shell getconf LONG_BIT)
-ifeq ($(BITS),64)
-	ASTLIBDIR=$(INSTALL_PREFIX)/usr/lib64/asterisk
+ASTLIBDIR:=$(shell awk '/moddir/{print $$3}' /etc/asterisk/asterisk.conf)
+ifeq ($(strip $(ASTLIBDIR)),)
+	MODULES_DIR=$(INSTALL_PREFIX)/usr/lib/asterisk/modules
 else
-	ASTLIBDIR=$(INSTALL_PREFIX)/usr/lib/asterisk
+	MODULES_DIR=$(INSTALL_PREFIX)$(ASTLIBDIR)
 endif
-MODULES_DIR=$(ASTLIBDIR)/modules
 ASTETCDIR=$(INSTALL_PREFIX)/etc/asterisk
 SAMPLENAME=flite.conf.sample
 CONFNAME=$(basename $(SAMPLENAME))
@@ -22,7 +21,7 @@ CC=gcc
 OPTIMIZE=-O2
 DEBUG=-g
 
-LIBS+=-lm -lflite -lflite_cmulex -lflite_usenglish -lflite_cmu_us_kal16 -lflite_cmu_us_awb -lflite_cmu_us_rms -lflite_cmu_us_slt
+LIBS+=-lm -lflite -lflite_cmulex -lflite_usenglish -lflite_cmu_us_kal -lflite_cmu_us_kal16 -lflite_cmu_us_awb -lflite_cmu_us_rms -lflite_cmu_us_slt
 CFLAGS+=-pipe -fPIC -Wall -Wstrict-prototypes -Wmissing-prototypes -Wmissing-declarations -D_REENTRANT -D_GNU_SOURCE
 
 all: _all
