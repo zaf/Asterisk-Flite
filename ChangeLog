@@ -1,3 +1,6 @@
+2011-11-11 Lefteris Zafiris <zaf.000@gmail.com> - 2-1-flite-1.3
+	Released as stable version 2.1
+
 2011-21-10 Lefteris Zafiris <zaf.000@gmail.com> - 2.1-rc2-flite-1.3
 	Changed config file handling. Config values are 
 	readed once during module loading. Added option for
