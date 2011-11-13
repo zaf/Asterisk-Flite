@@ -13,7 +13,6 @@ ifeq ($(strip $(ASTLIBDIR)),)
 else
 	MODULES_DIR=$(INSTALL_PREFIX)$(ASTLIBDIR)
 endif
-MODULES_DIR=$(ASTLIBDIR)/modules
 ASTETCDIR=$(INSTALL_PREFIX)/etc/asterisk
 SAMPLENAME=flite.conf.sample
 CONFNAME=$(basename $(SAMPLENAME))
