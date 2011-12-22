@@ -108,7 +108,7 @@ static int read_config(void)
 		if ((temp = ast_variable_retrieve(cfg, "general", "samplerate")))
 			target_sample_rate = atoi(temp);
 	}
-	
+
 	if (target_sample_rate != 8000 && target_sample_rate != 16000) {
 		ast_log(LOG_WARNING, "Flite: Unsupported sample rate: %d. Falling back to %d\n",
 				target_sample_rate, DEF_RATE);
