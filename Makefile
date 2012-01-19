@@ -21,7 +21,7 @@ CC=gcc
 OPTIMIZE=-O2
 DEBUG=-g
 
-LIBS+=-lm -lflite -lflite_cmulex -lflite_usenglish -lflite_cmu_us_kal
+LIBS+=-lflite -lflite_cmulex -lflite_usenglish -lflite_cmu_us_kal
 CFLAGS+=-pipe -fPIC -Wall -Wstrict-prototypes -Wmissing-prototypes -Wmissing-declarations -D_REENTRANT -D_GNU_SOURCE
 
 all: _all
