@@ -71,7 +71,7 @@ static int read_config(void)
 	/* Setting default values */
 	usecache = 0;
 	cachedir = DEF_DIR;
-	
+
 	cfg = ast_config_load(FLITE_CONFIG, config_flags);
 	if (!cfg || cfg == CONFIG_STATUS_FILEINVALID) {
 		ast_log(LOG_WARNING,
@@ -132,12 +132,12 @@ static int flite_exec(struct ast_channel *chan, const char *data)
 				writecache = 1;
 			} else {
 				ast_debug(1, "Flite: Cache file exists.\n");
-				if (chan->_state != AST_STATE_UP)
+				if (ast_channel_state(chan) != AST_STATE_UP)
 					ast_answer(chan);
-				res = ast_streamfile(chan, cachefile, chan->language);
+				res = ast_streamfile(chan, cachefile, ast_channel_language(chan));
 				if (res) {
 					ast_log(LOG_ERROR, "Flite: ast_streamfile from cache failed on %s\n",
-							chan->name);
+							ast_channel_name(chan));
 				} else {
 					res = ast_waitstream(chan, args.interrupt);
 					ast_stopstream(chan);
@@ -168,11 +168,11 @@ static int flite_exec(struct ast_channel *chan, const char *data)
 		ast_filecopy(tmp_name, cachefile, NULL);
 	}
 
-	if (chan->_state != AST_STATE_UP)
+	if (ast_channel_state(chan) != AST_STATE_UP)
 		ast_answer(chan);
-	res = ast_streamfile(chan, tmp_name, chan->language);
+	res = ast_streamfile(chan, tmp_name, ast_channel_language(chan));
 	if (res) {
-		ast_log(LOG_ERROR, "Flite: ast_streamfile failed on %s\n", chan->name);
+		ast_log(LOG_ERROR, "Flite: ast_streamfile failed on %s\n", ast_channel_name(chan));
 	} else {
 		res = ast_waitstream(chan, args.interrupt);
 		ast_stopstream(chan);
