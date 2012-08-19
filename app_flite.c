@@ -65,34 +65,33 @@ static int usecache;
 static struct ast_config *cfg;
 static struct ast_flags config_flags = { 0 };
 
-static int read_config(void)
+static int read_config(const char *flite_conf)
 {
 	const char *temp;
 	/* Setting default values */
 	usecache = 0;
 	cachedir = DEF_DIR;
 
-	cfg = ast_config_load(FLITE_CONFIG, config_flags);
+	cfg = ast_config_load(flite_conf, config_flags);
 	if (!cfg || cfg == CONFIG_STATUS_FILEINVALID) {
 		ast_log(LOG_WARNING,
-				"Flite: Unable to read config file %s. Using default settings\n",
-				FLITE_CONFIG);
+				"Flite: Unable to read config file %s. Using default settings\n", flite_conf);
 	} else {
 		if ((temp = ast_variable_retrieve(cfg, "general", "usecache")))
 			usecache = ast_true(temp);
-
 		if ((temp = ast_variable_retrieve(cfg, "general", "cachedir")))
 			cachedir = temp;
 	}
 	return 0;
 }
+
 static int flite_exec(struct ast_channel *chan, const char *data)
 {
 	int res = 0;
 	char *mydata;
 	int writecache = 0;
-	char MD5_name[33] = "";
-	char cachefile[MAXLEN] = "";
+	char MD5_name[33];
+	char cachefile[MAXLEN];
 	char tmp_name[20];
 	char raw_tmp_name[26];
 	cst_wave *raw_data;
@@ -181,10 +180,10 @@ static int flite_exec(struct ast_channel *chan, const char *data)
 	return res;
 }
 
-static int reload(void)
+static int reload_module(void)
 {
 	ast_config_destroy(cfg);
-	read_config();
+	read_config(FLITE_CONFIG);
 	return 0;
 }
 
@@ -196,7 +195,7 @@ static int unload_module(void)
 
 static int load_module(void)
 {
-	read_config();
+	read_config(FLITE_CONFIG);
 	return ast_register_application(app, flite_exec, synopsis, descrip) ?
 		AST_MODULE_LOAD_DECLINE : AST_MODULE_LOAD_SUCCESS;
 }
@@ -204,5 +203,5 @@ static int load_module(void)
 AST_MODULE_INFO(ASTERISK_GPL_KEY, AST_MODFLAG_DEFAULT, "Flite TTS Interface",
 		.load = load_module,
 		.unload = unload_module,
-		.reload = reload,
+		.reload = reload_module,
 			);

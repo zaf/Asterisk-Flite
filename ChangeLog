@@ -1,12 +1,16 @@
-2011-11-11 Lefteris Zafiris <zaf.000@gmail.com> - 2-1-flite-1.3
+2012-08-19 Lefteris Zafiris <zaf.000@gmail.com> - 2.2-rc1-flite-1.3
+	Fixed compatibility with asterisk 11
+	Minor code cleanups and fixes.
+
+2011-11-11 Lefteris Zafiris <zaf.000@gmail.com> - 2.1-flite-1.3
 	Released as stable version 2.1
 
-2011-21-10 Lefteris Zafiris <zaf.000@gmail.com> - 2.1-rc2-flite-1.3
-	Changed config file handling. Config values are 
-	readed once during module loading. Added option for
+2011-10-21 Lefteris Zafiris <zaf.000@gmail.com> - 2.1-rc2-flite-1.3
+	Changed config file handling. Config values are
+	read once during module loading. Added option for
 	module reload that re-reads the config values.
 
-2011-29-09 Lefteris Zafiris <zaf.000@gmail.com> - 2.1-rc1-flite-1.3
+2011-09-29 Lefteris Zafiris <zaf.000@gmail.com> - 2.1-rc1-flite-1.3
 	New branch compatible with older version of flite (v 1.3)
 	This version doesn not support generation of 16kHz sound
 	files or choice of voices.
