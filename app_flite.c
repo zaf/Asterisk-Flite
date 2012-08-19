@@ -36,6 +36,7 @@
 ASTERISK_FILE_VERSION(__FILE__, "$Revision: 00 $")
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include <flite/flite.h>
 #include "asterisk/file.h"
 #include "asterisk/channel.h"
@@ -105,7 +106,7 @@ static int read_config(const char *flite_conf)
 			voice_name = temp;
 
 		if ((temp = ast_variable_retrieve(cfg, "general", "samplerate")))
-			target_sample_rate = atoi(temp);
+			target_sample_rate = (int) strtol(temp, NULL, 10);
 	}
 
 	if (target_sample_rate != 8000 && target_sample_rate != 16000) {
