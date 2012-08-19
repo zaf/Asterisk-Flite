@@ -1,27 +1,31 @@
+2012-08-19 Lefteris Zafiris <zaf.000@gmail.com> - 2.2-rc1
+	Fixed compatibility with asterisk 11
+	Minor code cleanups and fixes.
+
 2011-11-11 Lefteris Zafiris <zaf.000@gmail.com> - 2.1
 	Released as stable version 2.1
 
-2011-21-10 Lefteris Zafiris <zaf.000@gmail.com> - 2.1-rc3
+2011-10-21 Lefteris Zafiris <zaf.000@gmail.com> - 2.1-rc3
 	Changed config file handling. Config values are
 	read once during module loading. Added option for
 	module reload that re-reads the config values.
 
-2011-20-09 Lefteris Zafiris <zaf.000@gmail.com> - 2.1-rc2
+2011-09-20 Lefteris Zafiris <zaf.000@gmail.com> - 2.1-rc2
 	Changed output file format to sln16 (16bit signed linear
 	PCM at 16000Hz). Added back support for asterisk 1.6 and
 	8000Hz sound files.
 
-2011-26-08 Lefteris Zafiris <zaf.000@gmail.com> - 2.1-rc1
+2011-08-26 Lefteris Zafiris <zaf.000@gmail.com> - 2.1-rc1
 	Added option to choose between available flite voices.
 	Dropped support for asterisk 1.6 and 8000Hz sound files
 
-2011-20-08 Lefteris Zafiris <zaf.000@gmail.com> - 2.0
+2011-08-20 Lefteris Zafiris <zaf.000@gmail.com> - 2.0
     Added option for generating 16kHz sound files
     Labelled as stable
 
-2009-01-09 Lefteris Zafiris <zaf.000@gmail.com> - 1.6-0.1-beta2
+2009-09-01 Lefteris Zafiris <zaf.000@gmail.com> - 1.6-0.1-beta2
 	Re-licensed under Gnu GPL version 2 for compatibility with
 	asterisk.
 
-2009-28-08 Lefteris Zafiris <zaf.000@gmail.com> - 1.6-0.1-beta
+2009-08-28 Lefteris Zafiris <zaf.000@gmail.com> - 1.6-0.1-beta
 	Initial release 1.6-0.1-beta

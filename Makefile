@@ -22,7 +22,7 @@ OPTIMIZE=-O2
 DEBUG=-g
 
 LIBS+=-lflite -lflite_cmulex -lflite_usenglish -lflite_cmu_us_kal -lflite_cmu_us_kal16 -lflite_cmu_us_awb -lflite_cmu_us_rms -lflite_cmu_us_slt
-CFLAGS+=-pipe -fPIC -Wall -Wstrict-prototypes -Wmissing-prototypes -Wmissing-declarations -D_REENTRANT -D_GNU_SOURCE
+CFLAGS+=-pipe -fPIC -Wall -Wextra -Wstrict-prototypes -Wmissing-prototypes -Wmissing-declarations -D_REENTRANT -D_GNU_SOURCE
 
 all: _all
 	@echo " +--------- app_flite Build Complete --------+"
