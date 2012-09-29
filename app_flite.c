@@ -1,7 +1,7 @@
 /*
  * Asterisk -- An open source telephony toolkit.
  *
- * Copyright (C) 2009 - 2011, Lefteris Zafiris
+ * Copyright (C) 2009 - 2012, Lefteris Zafiris
  *
  * Lefteris Zafiris <zaf.000@gmail.com>
  *
@@ -35,16 +35,15 @@
 
 ASTERISK_FILE_VERSION(__FILE__, "$Revision: 00 $")
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <stdlib.h>
 #include <flite/flite.h>
-#include "asterisk/file.h"
+#include "asterisk/app.h"
 #include "asterisk/channel.h"
 #include "asterisk/module.h"
 #include "asterisk/config.h"
-#include "asterisk/app.h"
 #include "asterisk/utils.h"
-#include "asterisk/strings.h"
 
 #define AST_MODULE "Flite"
 #define FLITE_CONFIG "flite.conf"
@@ -122,7 +121,6 @@ static int flite_exec(struct ast_channel *chan, const char *data)
 	int res = 0;
 	char *mydata;
 	int writecache = 0;
-	char MD5_name[33];
 	int sample_rate;
 	char cachefile[MAXLEN];
 	char tmp_name[20];
@@ -156,6 +154,7 @@ static int flite_exec(struct ast_channel *chan, const char *data)
 
 	/*Cache mechanism */
 	if (usecache) {
+		char MD5_name[33];
 		ast_md5_hash(MD5_name, args.text);
 		if (strlen(cachedir) + strlen(MD5_name) + 6 <= MAXLEN) {
 			ast_debug(1, "Flite: Activating cache mechanism...\n");
