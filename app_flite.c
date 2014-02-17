@@ -1,7 +1,7 @@
 /*
  * Asterisk -- An open source telephony toolkit.
  *
- * Copyright (C) 2009 - 2012, Lefteris Zafiris
+ * Copyright (C) 2009 - 2014, Lefteris Zafiris
  *
  * Lefteris Zafiris <zaf.000@gmail.com>
  *
@@ -199,7 +199,7 @@ static int load_module(void)
 }
 
 AST_MODULE_INFO(ASTERISK_GPL_KEY, AST_MODFLAG_DEFAULT, "Flite TTS Interface",
-		.load = load_module,
-		.unload = unload_module,
-		.reload = reload_module,
-			);
+	.load = load_module,
+	.unload = unload_module,
+	.reload = reload_module,
+);
