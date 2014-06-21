@@ -1,7 +1,7 @@
 /*
  * Asterisk -- An open source telephony toolkit.
  *
- * Copyright (C) 2009 - 2011, Lefteris Zafiris
+ * Copyright (C) 2009 - 2014, Lefteris Zafiris
  *
  * Lefteris Zafiris <zaf.000@gmail.com>
  *
@@ -37,13 +37,11 @@ ASTERISK_FILE_VERSION(__FILE__, "$Revision: 00 $")
 #include <stdio.h>
 #include <string.h>
 #include <flite/flite.h>
-#include "asterisk/file.h"
+#include "asterisk/app.h"
 #include "asterisk/channel.h"
 #include "asterisk/module.h"
 #include "asterisk/config.h"
-#include "asterisk/app.h"
 #include "asterisk/utils.h"
-#include "asterisk/strings.h"
 
 #define AST_MODULE "Flite"
 #define FLITE_CONFIG "flite.conf"
@@ -90,7 +88,6 @@ static int flite_exec(struct ast_channel *chan, const char *data)
 	int res = 0;
 	char *mydata;
 	int writecache = 0;
-	char MD5_name[33];
 	char cachefile[MAXLEN];
 	char tmp_name[20];
 	char raw_tmp_name[26];
@@ -122,6 +119,7 @@ static int flite_exec(struct ast_channel *chan, const char *data)
 
 	/*Cache mechanism */
 	if (usecache) {
+		char MD5_name[33];
 		ast_md5_hash(MD5_name, args.text);
 		if (strlen(cachedir) + strlen(MD5_name) + 6 <= MAXLEN) {
 			ast_debug(1, "Flite: Activating cache mechanism...\n");
@@ -201,7 +199,7 @@ static int load_module(void)
 }
 
 AST_MODULE_INFO(ASTERISK_GPL_KEY, AST_MODFLAG_DEFAULT, "Flite TTS Interface",
-		.load = load_module,
-		.unload = unload_module,
-		.reload = reload_module,
-			);
+	.load = load_module,
+	.unload = unload_module,
+	.reload = reload_module,
+);
