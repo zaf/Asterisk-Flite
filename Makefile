@@ -1,6 +1,6 @@
 #
 # Makefile for Asterisk flite application
-# Copyright (C) 2009 - 2011, Lefteris Zafiris
+# Copyright (C) 2009 - 2014, Lefteris Zafiris
 #
 # This program is free software, distributed under the terms of
 # the GNU General Public License Version 2. See the COPYING file
@@ -21,7 +21,7 @@ CC=gcc
 OPTIMIZE=-O2
 DEBUG=-g
 
-LIBS+=-lflite -lflite_cmulex -lflite_usenglish -lflite_cmu_us_kal
+LIBS+=-lflite_cmu_us_kal -lflite_usenglish -lflite_cmulex -lflite
 CFLAGS+=-pipe -fPIC -Wall -Wextra -Wstrict-prototypes -Wmissing-prototypes -Wmissing-declarations -D_REENTRANT -D_GNU_SOURCE
 
 all: _all
