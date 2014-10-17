@@ -51,9 +51,9 @@ ASTERISK_FILE_VERSION(__FILE__, "$Revision: 00 $")
 cst_voice *register_cmu_us_kal(void);
 void unregister_cmu_us_kal(cst_voice *v);
 
-static char *app = "Flite";
-static char *synopsis = "Say text to the user, using Flite TTS engine";
-static char *descrip =
+static const char *app = "Flite";
+static const char *synopsis = "Say text to the user, using Flite TTS engine";
+static const char *descrip =
 	" Flite(text[,intkeys]): This will invoke the Flite TTS engine, send a text string,\n"
 	"get back the resulting waveform and play it to the user, allowing any given interrupt\n"
 	"keys to immediately terminate and return the value, or 'any' to allow any number back.\n";
