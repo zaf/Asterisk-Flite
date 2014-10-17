@@ -67,9 +67,9 @@ void unregister_cmu_us_rms(cst_voice *v);
 cst_voice *register_cmu_us_slt(void);
 void unregister_cmu_us_slt(cst_voice *v);
 
-static char *app = "Flite";
-static char *synopsis = "Say text to the user, using Flite TTS engine";
-static char *descrip =
+static const char *app = "Flite";
+static const char *synopsis = "Say text to the user, using Flite TTS engine";
+static const char *descrip =
 	" Flite(text[,intkeys]): This will invoke the Flite TTS engine, send a text string,\n"
 	"get back the resulting waveform and play it to the user, allowing any given interrupt\n"
 	"keys to immediately terminate and return the value, or 'any' to allow any number back.\n";
@@ -104,8 +104,13 @@ static int read_config(const char *flite_conf)
 		if ((temp = ast_variable_retrieve(cfg, "general", "voice")))
 			voice_name = temp;
 
-		if ((temp = ast_variable_retrieve(cfg, "general", "samplerate")))
+		if ((temp = ast_variable_retrieve(cfg, "general", "samplerate"))) {
 			target_sample_rate = (int) strtol(temp, NULL, 10);
+			if (errno == ERANGE) {
+				ast_log(LOG_WARNING, "Flite: Error reading samplerate from config file\n");
+				target_sample_rate = DEF_RATE;
+			}
+		}
 	}
 
 	if (target_sample_rate != 8000 && target_sample_rate != 16000) {
