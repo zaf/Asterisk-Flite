@@ -86,11 +86,14 @@ static int read_config(const char *flite_conf)
 static int flite_exec(struct ast_channel *chan, const char *data)
 {
 	int res = 0;
-	char *mydata;
+	int raw_fd;
 	int writecache = 0;
+	FILE *fl;
+	char *mydata;
+	char *format = "sln";
 	char cachefile[MAXLEN];
-	char tmp_name[20];
-	char raw_tmp_name[26];
+	char tmp_name[18] = "/tmp/flite_XXXXXX";
+	char raw_tmp_name[24];
 	cst_wave *raw_data;
 	cst_voice *voice;
 	AST_DECLARE_APP_ARGS(args,
@@ -145,26 +148,30 @@ static int flite_exec(struct ast_channel *chan, const char *data)
 	}
 
 	/* Create temp filenames */
-	snprintf(tmp_name, sizeof(tmp_name), "/tmp/flite_%li", ast_random() %99999999);
-	snprintf(raw_tmp_name, sizeof(raw_tmp_name), "%s.sln", tmp_name);
+	if ((raw_fd = mkstemp(tmp_name)) == -1) {
+		ast_log(LOG_ERROR, "Flite: Failed to create audio file.\n");
+		return -1;
+	}
+	if ((fl = fdopen(raw_fd, "w+")) == NULL) {
+		ast_log(LOG_ERROR, "Flite: Failed to open audio file '%s'\n", tmp_name);
+		return -1;
+	}
 
 	/* Invoke Flite */
 	flite_init();
 	voice = register_cmu_us_kal();
 	raw_data = flite_text_to_wave(args.text, voice);
-	res = cst_wave_save_raw(raw_data, raw_tmp_name);
+	res = cst_wave_save_raw_fd(raw_data, fl);
+	fclose(fl);
 	delete_wave(raw_data);
 	unregister_cmu_us_kal(voice);
 	if (res) {
 		ast_log(LOG_ERROR, "Flite: failed to write file %s\n", raw_tmp_name);
 		return res;
 	}
-	/* Save file to cache if set */
-	if (writecache) {
-		ast_debug(1, "Flite: Saving cache file %s\n", cachefile);
-		ast_filecopy(tmp_name, cachefile, NULL);
-	}
 
+	snprintf(raw_tmp_name, sizeof(raw_tmp_name), "%s.%s", tmp_name, format);
+	rename(tmp_name, raw_tmp_name);
 	if (ast_channel_state(chan) != AST_STATE_UP)
 		ast_answer(chan);
 	res = ast_streamfile(chan, tmp_name, ast_channel_language(chan));
@@ -174,7 +181,14 @@ static int flite_exec(struct ast_channel *chan, const char *data)
 		res = ast_waitstream(chan, args.interrupt);
 		ast_stopstream(chan);
 	}
-	ast_filedelete(tmp_name, NULL);
+
+	/* Save file to cache if set */
+	if (writecache) {
+		ast_debug(1, "Flite: Saving cache file %s\n", cachefile);
+		ast_filerename(tmp_name, cachefile, format);
+	} else {
+		unlink(raw_tmp_name);
+	}
 	return res;
 }
 
