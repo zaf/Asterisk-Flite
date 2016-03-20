@@ -19,8 +19,7 @@ Installation
 $ make
 $ make install
 
-To install the sample configuration file, issue the following command after
-the 'make install' command:
+To install the sample configuration file, issue the following command:
 
 $ make samples
 
