@@ -1,3 +1,6 @@
+2016-03-20 Lefteris Zafiris <zaf.000@gmail.com> - 2.3
+	Proper temp file generation and handling - Security Fix -
+
 2015-05-17 Lefteris Zafiris <zaf.000@gmail.com> - 2.2
 	Released as stable version 2.2
 	Code cleanups. Better error handling in config file parsing.
