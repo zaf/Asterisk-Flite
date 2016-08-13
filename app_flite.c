@@ -3,7 +3,7 @@
  *
  * Copyright (C) 2009 - 2015, Lefteris Zafiris
  *
- * Lefteris Zafiris <zaf.000@gmail.com>
+ * Lefteris Zafiris <zaf@fastmail.com>
  *
  * See http://www.asterisk.org for more information about
  * the Asterisk project. Please do not directly contact
@@ -20,7 +20,7 @@
  *
  * \brief Say text to the user, using Flite TTS engine.
  *
- * \author\verbatim Lefteris Zafiris <zaf.000@gmail.com> \endverbatim
+ * \author\verbatim Lefteris Zafiris <zaf@fastmail.com> \endverbatim
  *
  * \extref Flite text to speech Synthesis System - http://www.speech.cs.cmu.edu/flite/
  *
