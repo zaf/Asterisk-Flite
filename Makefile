@@ -6,8 +6,7 @@
 # the GNU General Public License Version 2. See the COPYING file
 # at the top of the source tree.
 
-INSTALL:=install
-ASTLIBDIR:=$(shell awk '/moddir/{print $$3}' /etc/asterisk/asterisk.conf)
+ASTLIBDIR:=$(shell awk '/moddir/{print $$3}' /etc/asterisk/asterisk.conf 2> /dev/null)
 ifeq ($(strip $(ASTLIBDIR)),)
 	MODULES_DIR:=$(INSTALL_PREFIX)/usr/lib/asterisk/modules
 else
@@ -17,9 +16,10 @@ ASTETCDIR:=$(INSTALL_PREFIX)/etc/asterisk
 SAMPLENAME:=flite.conf.sample
 CONFNAME:=$(basename $(SAMPLENAME))
 
-CC=gcc
-OPTIMIZE=-O2
-DEBUG=-g
+INSTALL:=install
+CC:=gcc
+OPTIMIZE:=-O2
+DEBUG:=-g
 
 LIBS+=-lflite_cmu_us_kal -lflite_usenglish -lflite_cmulex -lflite
 CFLAGS+=-pipe -fPIC -Wall -Wextra -Wstrict-prototypes -Wmissing-prototypes -Wmissing-declarations -D_REENTRANT -D_GNU_SOURCE -DAST_MODULE_SELF_SYM=__internal_app_flite_self
@@ -33,7 +33,7 @@ all: app_flite.so
 	@echo " +-------------------------------------------+"
 
 app_flite.o: app_flite.c
-	$(CC) $(CFLAGS) $(DEBUG) $(OPTIMIZE) -c -o app_flite.o app_flite.c
+	$(CC) $(CFLAGS) $(DEBUG) $(OPTIMIZE) -c -o $@ $*.c
 
 app_flite.so: app_flite.o
 	$(CC) -shared -Xlinker -x -o $@ $< $(LIBS)
