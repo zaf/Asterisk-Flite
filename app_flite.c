@@ -51,6 +51,24 @@
 #define DEF_VOICE "kal"
 #define DEF_DIR "/tmp"
 
+/*** DOCUMENTATION
+	<application name="flite" language="en_US">
+		<synopsis>
+			Say text to the user, using flite speech synthesizer.
+		</synopsis>
+		<syntax>
+			<parameter name="text" required="true" />
+			<parameter name="intkeys" />
+			<parameter name="language" />
+		</syntax>
+		<description>
+			<para>flite(text[,intkeys,language]):  This will invoke the flite TTS engine,
+			send a text string, get back the resulting waveform and play it to the user,
+			allowing any given interrupt keys to immediately terminate and return.</para>
+		</description>
+	</application>
+ ***/
+
 cst_voice *register_cmu_us_awb(void);
 void unregister_cmu_us_awb(cst_voice *v);
 
@@ -67,11 +85,6 @@ cst_voice *register_cmu_us_slt(void);
 void unregister_cmu_us_slt(cst_voice *v);
 
 static const char *app = "Flite";
-static const char *synopsis = "Say text to the user, using Flite TTS engine";
-static const char *descrip =
-	" Flite(text[,intkeys]): This will invoke the Flite TTS engine, send a text string,\n"
-	"get back the resulting waveform and play it to the user, allowing any given interrupt\n"
-	"keys to immediately terminate and return the value, or 'any' to allow any number back.\n";
 
 static int target_sample_rate;
 static int usecache;
@@ -267,8 +280,7 @@ static int flite_exec(struct ast_channel *chan, const char *data)
 static int reload_module(void)
 {
 	ast_config_destroy(cfg);
-	read_config(FLITE_CONFIG);
-	return 0;
+	return read_config(FLITE_CONFIG);
 }
 
 static int unload_module(void)
@@ -280,8 +292,11 @@ static int unload_module(void)
 static int load_module(void)
 {
 	read_config(FLITE_CONFIG);
-	return ast_register_application(app, flite_exec, synopsis, descrip) ?
-		AST_MODULE_LOAD_DECLINE : AST_MODULE_LOAD_SUCCESS;
+	if (ast_register_application_xml(app, flite_exec)) {
+		ast_config_destroy(cfg);
+		return AST_MODULE_LOAD_DECLINE;
+	}
+	return AST_MODULE_LOAD_SUCCESS;
 }
 
 AST_MODULE_INFO(ASTERISK_GPL_KEY, AST_MODFLAG_DEFAULT, "Flite TTS Interface",
