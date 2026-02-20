@@ -1,7 +1,7 @@
 /*
  * Asterisk -- An open source telephony toolkit.
  *
- * Copyright (C) 2009 - 2015, Lefteris Zafiris
+ * Copyright (C) 2009 - 2026, Lefteris Zafiris
  *
  * Lefteris Zafiris <zaf@fastmail.com>
  *
@@ -33,10 +33,11 @@
 
 #include "asterisk.h"
 
+#include <pthread.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdlib.h>
 #include <flite/flite.h>
 #include "asterisk/app.h"
 #include "asterisk/channel.h"
@@ -93,6 +94,16 @@ static const char *voice_name;
 static struct ast_config *cfg;
 static struct ast_flags config_flags =  { 0 };
 
+struct flite_cfg {
+	int sample_rate;
+	int usecache;
+	char cachedir[256];
+	char voice[32];
+};
+
+static struct flite_cfg global_cfg;
+static ast_rwlock_t config_lock;
+
 static int read_config(const char *flite_conf)
 {
 	const char *temp;
@@ -106,6 +117,7 @@ static int read_config(const char *flite_conf)
 	if (!cfg || cfg == CONFIG_STATUS_FILEINVALID) {
 		ast_log(LOG_WARNING,
 				"Flite: Unable to read config file %s. Using default settings\n", flite_conf);
+		cfg = NULL;
 	} else {
 		if ((temp = ast_variable_retrieve(cfg, "general", "usecache")))
 			usecache = ast_true(temp);
@@ -117,6 +129,7 @@ static int read_config(const char *flite_conf)
 			voice_name = temp;
 
 		if ((temp = ast_variable_retrieve(cfg, "general", "samplerate"))) {
+			errno = 0;
 			target_sample_rate = (int) strtol(temp, NULL, 10);
 			if (errno == ERANGE) {
 				ast_log(LOG_WARNING, "Flite: Error reading samplerate from config file\n");
@@ -130,6 +143,13 @@ static int read_config(const char *flite_conf)
 				target_sample_rate, DEF_RATE);
 		target_sample_rate = DEF_RATE;
 	}
+	ast_rwlock_wrlock(&config_lock);
+	global_cfg.sample_rate = target_sample_rate;
+	global_cfg.usecache = usecache;
+	ast_copy_string(global_cfg.cachedir, cachedir, sizeof(global_cfg.cachedir));
+	ast_copy_string(global_cfg.voice, voice_name, sizeof(global_cfg.voice));
+	ast_rwlock_unlock(&config_lock);
+
 	return 0;
 }
 
@@ -145,6 +165,7 @@ static int flite_exec(struct ast_channel *chan, const char *data)
 	char raw_tmp_name[24];
 	cst_wave *raw_data;
 	cst_voice *voice;
+	struct flite_cfg local_cfg;
 	AST_DECLARE_APP_ARGS(args,
 		AST_APP_ARG(text);
 		AST_APP_ARG(interrupt);
@@ -167,16 +188,24 @@ static int flite_exec(struct ast_channel *chan, const char *data)
 		return res;
 	}
 
+	/* Snapshot config under read lock */
+	ast_rwlock_rdlock(&config_lock);
+	local_cfg = global_cfg;
+	ast_rwlock_unlock(&config_lock);
+
 	ast_debug(1, "Flite:\nText passed: %s\nInterrupt key(s): %s\nVoice: %s\nRate: %d\n",
-			args.text, args.interrupt, voice_name, target_sample_rate);
+			args.text, args.interrupt, local_cfg.voice, local_cfg.sample_rate);
 
 	/*Cache mechanism */
-	if (usecache) {
+	if (local_cfg.usecache) {
 		char MD5_name[33];
-		ast_md5_hash(MD5_name, args.text);
-		if (strlen(cachedir) + strlen(MD5_name) + 6 <= MAXLEN) {
+		char hash_input[MAXLEN];
+		snprintf(hash_input, sizeof(hash_input), "%s_%s_%d", args.text,
+		        local_cfg.voice, local_cfg.sample_rate);
+		ast_md5_hash(MD5_name, hash_input);
+		if (strlen(local_cfg.cachedir) + strlen(MD5_name) + 6 <= MAXLEN) {
 			ast_debug(1, "Flite: Activating cache mechanism...\n");
-			snprintf(cachefile, sizeof(cachefile), "%s/%s", cachedir, MD5_name);
+			snprintf(cachefile, sizeof(cachefile), "%s/%s", local_cfg.cachedir, MD5_name);
 			if (ast_fileexists(cachefile, NULL, NULL) <= 0) {
 				ast_debug(1, "Flite: Cache file does not yet exist.\n");
 				writecache = 1;
@@ -204,52 +233,57 @@ static int flite_exec(struct ast_channel *chan, const char *data)
 	}
 	if ((fl = fdopen(raw_fd, "w+")) == NULL) {
 		ast_log(LOG_ERROR, "Flite: Failed to open audio file '%s'\n", tmp_name);
+		close(raw_fd);
+		unlink(tmp_name);
 		return -1;
 	}
 
-	/* Invoke Flite */
-	flite_init();
-	if (strcmp(voice_name, "kal") == 0 && target_sample_rate == 8000)
+	if (strcmp(local_cfg.voice, "kal") == 0 && local_cfg.sample_rate == 8000)
 		voice = register_cmu_us_kal();
-	else if (strcmp(voice_name, "kal") == 0 && target_sample_rate == 16000)
+	else if (strcmp(local_cfg.voice, "kal") == 0 && local_cfg.sample_rate == 16000)
 		voice = register_cmu_us_kal16();
-	else if (strcmp(voice_name, "awb") == 0)
+	else if (strcmp(local_cfg.voice, "awb") == 0)
 		voice = register_cmu_us_awb();
-	else if (strcmp(voice_name, "rms") == 0)
+	else if (strcmp(local_cfg.voice, "rms") == 0)
 		voice = register_cmu_us_rms();
-	else if (strcmp(voice_name, "slt") == 0)
+	else if (strcmp(local_cfg.voice, "slt") == 0)
 		voice = register_cmu_us_slt();
 	else {
 		ast_log(LOG_WARNING, "Flite: Unsupported voice %s. Using default male voice.\n",
-				voice_name);
+				local_cfg.voice);
 		voice = register_cmu_us_kal();
 	}
 
 	raw_data = flite_text_to_wave(args.text, voice);
-	/* Resample if needed */
-	if (raw_data->sample_rate != target_sample_rate)
-		cst_wave_resample(raw_data, target_sample_rate);
-
-	res = cst_wave_save_raw_fd(raw_data, fl);
+	if (raw_data) {
+		/* Resample if needed */
+		if (raw_data->sample_rate != local_cfg.sample_rate) {
+			cst_wave_resample(raw_data, local_cfg.sample_rate);
+		}
+		res = cst_wave_save_raw_fd(raw_data, fl);
+	} else {
+		res = -1;
+	}
 	fclose(fl);
 	delete_wave(raw_data);
-	if (strcmp(voice_name, "awb") == 0)
+	if (strcmp(local_cfg.voice, "awb") == 0)
 		unregister_cmu_us_awb(voice);
-	else if (strcmp(voice_name, "rms") == 0)
+	else if (strcmp(local_cfg.voice, "rms") == 0)
 		unregister_cmu_us_rms(voice);
-	else if (strcmp(voice_name, "slt") == 0)
+	else if (strcmp(local_cfg.voice, "slt") == 0)
 		unregister_cmu_us_slt(voice);
-	else if (strcmp(voice_name, "kal") == 0 && target_sample_rate == 16000)
+	else if (strcmp(local_cfg.voice, "kal") == 0 && local_cfg.sample_rate == 16000)
 		unregister_cmu_us_kal16(voice);
 	else
 		unregister_cmu_us_kal(voice);
 
 	if (res) {
-		ast_log(LOG_ERROR, "Flite: failed to write file %s\n", raw_tmp_name);
+		ast_log(LOG_ERROR, "Flite: failed to synthesize text %s\n", args.text);
+		unlink(tmp_name);
 		return res;
 	}
 
-	if (target_sample_rate == 16000) {
+	if (local_cfg.sample_rate == 16000) {
 		format = "sln16";
 	} else {
 		format = "sln";
@@ -286,16 +320,20 @@ static int reload_module(void)
 static int unload_module(void)
 {
 	ast_config_destroy(cfg);
+	ast_rwlock_destroy(&config_lock);
 	return ast_unregister_application(app);
 }
 
 static int load_module(void)
 {
+	ast_rwlock_init(&config_lock);
 	read_config(FLITE_CONFIG);
 	if (ast_register_application_xml(app, flite_exec)) {
 		ast_config_destroy(cfg);
+		ast_rwlock_destroy(&config_lock);
 		return AST_MODULE_LOAD_DECLINE;
 	}
+	flite_init();
 	return AST_MODULE_LOAD_SUCCESS;
 }
 
