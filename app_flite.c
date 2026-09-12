@@ -281,7 +281,9 @@ static int flite_exec(struct ast_channel *chan, const char *data)
 
 	/* Invoke Flite */
 	if (strcmp(l_voice, "kal") == 0)
-		voice = (t_rate == 16000) ? v_kal16 : v_kal;
+		voice = v_kal;
+	else if (strcmp(l_voice, "kal16") == 0)
+		voice = v_kal16;
 	else if (strcmp(l_voice, "awb") == 0)
 		voice = v_awb;
 	else if (strcmp(l_voice, "rms") == 0)
