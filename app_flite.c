@@ -193,8 +193,8 @@ static int flite_exec(struct ast_channel *chan, const char *data)
 	FILE *fl;
 	char *mydata, *format;
 	char cachefile[MAXLEN];
-	char tmp_name[18] = "/tmp/flite_XXXXXX";
-	char raw_tmp_name[24];
+	char tmp_name[MAXLEN + 16];
+	char raw_tmp_name[MAXLEN + 24];
 	int use_cache, t_rate;
 	char l_cachedir[MAXLEN];
 	char l_voice[16];
@@ -267,8 +267,17 @@ static int flite_exec(struct ast_channel *chan, const char *data)
 		}
 	}
 
-	/* Create temp filenames */
-	if ((raw_fd = mkstemp(tmp_name)) == -1) {
+	/* Create the temp file in the cache dir when a cache write is pending,
+	 * so the final rename is atomic and on the same filesystem. */
+	if (writecache)
+		snprintf(tmp_name, sizeof(tmp_name), "%s/flite_XXXXXX", l_cachedir);
+	else
+		ast_copy_string(tmp_name, "/tmp/flite_XXXXXX", sizeof(tmp_name));
+	if ((raw_fd = mkstemp(tmp_name)) == -1 && writecache) {
+		ast_copy_string(tmp_name, "/tmp/flite_XXXXXX", sizeof(tmp_name));
+		raw_fd = mkstemp(tmp_name);
+	}
+	if (raw_fd == -1) {
 		ast_log(LOG_ERROR, "Flite: Failed to create audio file.\n");
 		return -1;
 	}
