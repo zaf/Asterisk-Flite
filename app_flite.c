@@ -1,7 +1,7 @@
 /*
  * Asterisk -- An open source telephony toolkit.
  *
- * Copyright (C) 2009 - 2015, Lefteris Zafiris
+ * Copyright (C) 2009 - 2026, Lefteris Zafiris
  *
  * Lefteris Zafiris <zaf@fastmail.com>
  *
@@ -36,13 +36,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdlib.h>
+#include <errno.h>
+#include <sys/stat.h>
 #include <flite/flite.h>
 #include "asterisk/app.h"
 #include "asterisk/channel.h"
 #include "asterisk/module.h"
 #include "asterisk/config.h"
 #include "asterisk/utils.h"
+#include "asterisk/lock.h"
 
 #define AST_MODULE "Flite"
 #define FLITE_CONFIG "flite.conf"
@@ -52,77 +54,116 @@
 #define DEF_DIR "/tmp"
 
 /*** DOCUMENTATION
-	<application name="flite" language="en_US">
+	<application name="Flite" language="en_US">
 		<synopsis>
 			Say text to the user, using flite speech synthesizer.
 		</synopsis>
 		<syntax>
 			<parameter name="text" required="true" />
 			<parameter name="intkeys" />
-			<parameter name="language" />
 		</syntax>
 		<description>
-			<para>flite(text[,intkeys,language]):  This will invoke the flite TTS engine,
+			<para>Flite(text[,intkeys]):  This will invoke the flite TTS engine,
 			send a text string, get back the resulting waveform and play it to the user,
 			allowing any given interrupt keys to immediately terminate and return.</para>
 		</description>
 	</application>
  ***/
 
-cst_voice *register_cmu_us_awb(void);
+cst_voice *register_cmu_us_awb(const char *voxdir);
 void unregister_cmu_us_awb(cst_voice *v);
 
-cst_voice *register_cmu_us_kal(void);
+cst_voice *register_cmu_us_kal(const char *voxdir);
 void unregister_cmu_us_kal(cst_voice *v);
 
-cst_voice *register_cmu_us_kal16(void);
+cst_voice *register_cmu_us_kal16(const char *voxdir);
 void unregister_cmu_us_kal16(cst_voice *v);
 
-cst_voice *register_cmu_us_rms(void);
+cst_voice *register_cmu_us_rms(const char *voxdir);
 void unregister_cmu_us_rms(cst_voice *v);
 
-cst_voice *register_cmu_us_slt(void);
+cst_voice *register_cmu_us_slt(const char *voxdir);
 void unregister_cmu_us_slt(cst_voice *v);
+
+/* Voices are registered once at load and shared read-only between
+ * channel threads; flite synthesis itself is thread safe. */
+static cst_voice *v_kal, *v_kal16, *v_awb, *v_rms, *v_slt;
 
 static const char *app = "Flite";
 
 static int target_sample_rate;
 static int usecache;
-static const char *cachedir;
-static const char *voice_name;
-static struct ast_config *cfg;
-static struct ast_flags config_flags =  { 0 };
+static char cachedir[MAXLEN];
+static char voice_name[16];
+
+/* Protects the config values above. */
+AST_RWLOCK_DEFINE_STATIC(cfg_lock);
+
+static void unregister_voices(void)
+{
+	if (v_kal)
+		unregister_cmu_us_kal(v_kal);
+	if (v_kal16)
+		unregister_cmu_us_kal16(v_kal16);
+	if (v_awb)
+		unregister_cmu_us_awb(v_awb);
+	if (v_rms)
+		unregister_cmu_us_rms(v_rms);
+	if (v_slt)
+		unregister_cmu_us_slt(v_slt);
+	v_kal = v_kal16 = v_awb = v_rms = v_slt = NULL;
+}
+
+static int parse_int(const char *val, int def, int min, int max, const char *name)
+{
+	char *end;
+	long n;
+
+	errno = 0;
+	n = strtol(val, &end, 10);
+	if (errno || end == val || *end || n < min || n > max) {
+		ast_log(LOG_WARNING,
+				"Flite: Invalid value '%s' for %s (valid: %d-%d), using default %d\n",
+				val, name, min, max, def);
+		return def;
+	}
+	return (int) n;
+}
 
 static int read_config(const char *flite_conf)
 {
 	const char *temp;
-	/* set default values */
-	target_sample_rate = DEF_RATE;
-	usecache = 0;
-	cachedir = DEF_DIR;
-	voice_name = DEF_VOICE;
+	struct ast_config *cfg;
+	struct ast_flags config_flags = { 0 };
 
 	cfg = ast_config_load(flite_conf, config_flags);
 	if (!cfg || cfg == CONFIG_STATUS_FILEINVALID) {
 		ast_log(LOG_WARNING,
 				"Flite: Unable to read config file %s. Using default settings\n", flite_conf);
-	} else {
+		cfg = NULL;
+	}
+
+	ast_rwlock_wrlock(&cfg_lock);
+	/* set default values */
+	target_sample_rate = DEF_RATE;
+	usecache = 0;
+	ast_copy_string(cachedir, DEF_DIR, sizeof(cachedir));
+	ast_copy_string(voice_name, DEF_VOICE, sizeof(voice_name));
+
+	if (cfg) {
 		if ((temp = ast_variable_retrieve(cfg, "general", "usecache")))
 			usecache = ast_true(temp);
 
-		if ((temp = ast_variable_retrieve(cfg, "general", "cachedir")))
-			cachedir = temp;
+		temp = ast_variable_retrieve(cfg, "general", "cachedir");
+		if (!ast_strlen_zero(temp))
+			ast_copy_string(cachedir, temp, sizeof(cachedir));
 
-		if ((temp = ast_variable_retrieve(cfg, "general", "voice")))
-			voice_name = temp;
+		temp = ast_variable_retrieve(cfg, "general", "voice");
+		if (!ast_strlen_zero(temp))
+			ast_copy_string(voice_name, temp, sizeof(voice_name));
 
-		if ((temp = ast_variable_retrieve(cfg, "general", "samplerate"))) {
-			target_sample_rate = (int) strtol(temp, NULL, 10);
-			if (errno == ERANGE) {
-				ast_log(LOG_WARNING, "Flite: Error reading samplerate from config file\n");
-				target_sample_rate = DEF_RATE;
-			}
-		}
+		if ((temp = ast_variable_retrieve(cfg, "general", "samplerate")))
+			target_sample_rate = parse_int(temp, DEF_RATE, 8000, 16000, "samplerate");
 	}
 
 	if (target_sample_rate != 8000 && target_sample_rate != 16000) {
@@ -130,6 +171,17 @@ static int read_config(const char *flite_conf)
 				target_sample_rate, DEF_RATE);
 		target_sample_rate = DEF_RATE;
 	}
+	if (usecache) {
+		struct stat st;
+		if (stat(cachedir, &st) || !S_ISDIR(st.st_mode))
+			ast_log(LOG_WARNING, "Flite: Cache directory %s does not exist\n", cachedir);
+		else if (st.st_mode & S_IWOTH)
+			ast_log(LOG_WARNING,
+					"Flite: Cache directory %s is world-writable, cache can be poisoned\n", cachedir);
+	}
+	ast_rwlock_unlock(&cfg_lock);
+	if (cfg)
+		ast_config_destroy(cfg);
 	return 0;
 }
 
@@ -143,6 +195,9 @@ static int flite_exec(struct ast_channel *chan, const char *data)
 	char cachefile[MAXLEN];
 	char tmp_name[18] = "/tmp/flite_XXXXXX";
 	char raw_tmp_name[24];
+	int use_cache, t_rate;
+	char l_cachedir[MAXLEN];
+	char l_voice[16];
 	cst_wave *raw_data;
 	cst_voice *voice;
 	AST_DECLARE_APP_ARGS(args,
@@ -161,6 +216,13 @@ static int flite_exec(struct ast_channel *chan, const char *data)
 	if (args.interrupt && !strcasecmp(args.interrupt, "any"))
 		args.interrupt = AST_DIGIT_ANY;
 
+	ast_rwlock_rdlock(&cfg_lock);
+	use_cache = usecache;
+	t_rate = target_sample_rate;
+	ast_copy_string(l_cachedir, cachedir, sizeof(l_cachedir));
+	ast_copy_string(l_voice, voice_name, sizeof(l_voice));
+	ast_rwlock_unlock(&cfg_lock);
+
 	args.text = ast_strip_quoted(args.text, "\"", "\"");
 	if (ast_strlen_zero(args.text)) {
 		ast_log(LOG_WARNING, "Flite: No text passed for synthesis.\n");
@@ -168,31 +230,39 @@ static int flite_exec(struct ast_channel *chan, const char *data)
 	}
 
 	ast_debug(1, "Flite:\nText passed: %s\nInterrupt key(s): %s\nVoice: %s\nRate: %d\n",
-			args.text, args.interrupt, voice_name, target_sample_rate);
+			args.text, S_OR(args.interrupt, "none"), l_voice, t_rate);
+
+	if (t_rate == 16000)
+		format = "sln16";
+	else
+		format = "sln";
 
 	/*Cache mechanism */
-	if (usecache) {
-		char MD5_name[33];
-		ast_md5_hash(MD5_name, args.text);
-		if (strlen(cachedir) + strlen(MD5_name) + 6 <= MAXLEN) {
-			ast_debug(1, "Flite: Activating cache mechanism...\n");
-			snprintf(cachefile, sizeof(cachefile), "%s/%s", cachedir, MD5_name);
-			if (ast_fileexists(cachefile, NULL, NULL) <= 0) {
-				ast_debug(1, "Flite: Cache file does not yet exist.\n");
-				writecache = 1;
-			} else {
-				ast_debug(1, "Flite: Cache file exists.\n");
+	if (use_cache) {
+		char text_hash[41], key[128], hash[41];
+		struct stat st;
+
+		ast_sha1_hash(text_hash, args.text);
+		snprintf(key, sizeof(key), "%s|%s|%d", text_hash, l_voice, t_rate);
+		if (strlen(l_cachedir) + sizeof(hash) + 6 <= MAXLEN) {
+			char cachepath[MAXLEN + 8];
+
+			ast_sha1_hash(hash, key);
+			snprintf(cachefile, sizeof(cachefile), "%s/%s", l_cachedir, hash);
+			snprintf(cachepath, sizeof(cachepath), "%s.%s", cachefile, format);
+			writecache = 1;
+			if (lstat(cachepath, &st) == 0 && S_ISREG(st.st_mode)
+					&& st.st_uid == geteuid() && st.st_size > 0) {
+				ast_debug(1, "Flite: Serving from cache file %s\n", cachepath);
 				if (ast_channel_state(chan) != AST_STATE_UP)
 					ast_answer(chan);
 				res = ast_streamfile(chan, cachefile, ast_channel_language(chan));
-				if (res) {
-					ast_log(LOG_ERROR, "Flite: ast_streamfile from cache failed on %s\n",
-							ast_channel_name(chan));
-				} else {
+				if (!res) {
 					res = ast_waitstream(chan, args.interrupt);
 					ast_stopstream(chan);
 					return res;
 				}
+				ast_log(LOG_WARNING, "Flite: Bad cache entry %s, regenerating\n", cachepath);
 			}
 		}
 	}
@@ -204,58 +274,50 @@ static int flite_exec(struct ast_channel *chan, const char *data)
 	}
 	if ((fl = fdopen(raw_fd, "w+")) == NULL) {
 		ast_log(LOG_ERROR, "Flite: Failed to open audio file '%s'\n", tmp_name);
+		close(raw_fd);
+		unlink(tmp_name);
 		return -1;
 	}
 
 	/* Invoke Flite */
-	flite_init();
-	if (strcmp(voice_name, "kal") == 0 && target_sample_rate == 8000)
-		voice = register_cmu_us_kal();
-	else if (strcmp(voice_name, "kal") == 0 && target_sample_rate == 16000)
-		voice = register_cmu_us_kal16();
-	else if (strcmp(voice_name, "awb") == 0)
-		voice = register_cmu_us_awb();
-	else if (strcmp(voice_name, "rms") == 0)
-		voice = register_cmu_us_rms();
-	else if (strcmp(voice_name, "slt") == 0)
-		voice = register_cmu_us_slt();
+	if (strcmp(l_voice, "kal") == 0)
+		voice = (t_rate == 16000) ? v_kal16 : v_kal;
+	else if (strcmp(l_voice, "awb") == 0)
+		voice = v_awb;
+	else if (strcmp(l_voice, "rms") == 0)
+		voice = v_rms;
+	else if (strcmp(l_voice, "slt") == 0)
+		voice = v_slt;
 	else {
 		ast_log(LOG_WARNING, "Flite: Unsupported voice %s. Using default male voice.\n",
-				voice_name);
-		voice = register_cmu_us_kal();
+				l_voice);
+		voice = v_kal;
 	}
 
 	raw_data = flite_text_to_wave(args.text, voice);
-	/* Resample if needed */
-	if (raw_data->sample_rate != target_sample_rate)
-		cst_wave_resample(raw_data, target_sample_rate);
-
-	res = cst_wave_save_raw_fd(raw_data, fl);
+	if (raw_data) {
+		/* Resample if needed */
+		if (raw_data->sample_rate != t_rate)
+			cst_wave_resample(raw_data, t_rate);
+		res = cst_wave_save_raw_fd(raw_data, fl);
+		delete_wave(raw_data);
+	} else {
+		res = -1;
+	}
 	fclose(fl);
-	delete_wave(raw_data);
-	if (strcmp(voice_name, "awb") == 0)
-		unregister_cmu_us_awb(voice);
-	else if (strcmp(voice_name, "rms") == 0)
-		unregister_cmu_us_rms(voice);
-	else if (strcmp(voice_name, "slt") == 0)
-		unregister_cmu_us_slt(voice);
-	else if (strcmp(voice_name, "kal") == 0 && target_sample_rate == 16000)
-		unregister_cmu_us_kal16(voice);
-	else
-		unregister_cmu_us_kal(voice);
 
 	if (res) {
-		ast_log(LOG_ERROR, "Flite: failed to write file %s\n", raw_tmp_name);
-		return res;
+		ast_log(LOG_ERROR, "Flite: Failed to synthesize or write audio file %s\n", tmp_name);
+		unlink(tmp_name);
+		return -1;
 	}
 
-	if (target_sample_rate == 16000) {
-		format = "sln16";
-	} else {
-		format = "sln";
-	}
 	snprintf(raw_tmp_name, sizeof(raw_tmp_name), "%s.%s", tmp_name, format);
-	rename(tmp_name, raw_tmp_name);
+	if (rename(tmp_name, raw_tmp_name)) {
+		ast_log(LOG_ERROR, "Flite: Failed to rename audio file: %s\n", strerror(errno));
+		unlink(tmp_name);
+		return -1;
+	}
 
 	if (ast_channel_state(chan) != AST_STATE_UP)
 		ast_answer(chan);
@@ -270,7 +332,11 @@ static int flite_exec(struct ast_channel *chan, const char *data)
 	/* Save file to cache if set */
 	if (writecache) {
 		ast_debug(1, "Flite: Saving cache file %s\n", cachefile);
-		ast_filerename(tmp_name, cachefile, format);
+		if (ast_filerename(tmp_name, cachefile, format)) {
+			if (ast_filecopy(tmp_name, cachefile, format))
+				ast_log(LOG_WARNING, "Flite: Failed to save cache file %s\n", cachefile);
+			unlink(raw_tmp_name);
+		}
 	} else {
 		unlink(raw_tmp_name);
 	}
@@ -279,21 +345,33 @@ static int flite_exec(struct ast_channel *chan, const char *data)
 
 static int reload_module(void)
 {
-	ast_config_destroy(cfg);
 	return read_config(FLITE_CONFIG);
 }
 
 static int unload_module(void)
 {
-	ast_config_destroy(cfg);
-	return ast_unregister_application(app);
+	int res = ast_unregister_application(app);
+
+	unregister_voices();
+	return res;
 }
 
 static int load_module(void)
 {
 	read_config(FLITE_CONFIG);
+	flite_init();
+	v_kal = register_cmu_us_kal(NULL);
+	v_kal16 = register_cmu_us_kal16(NULL);
+	v_awb = register_cmu_us_awb(NULL);
+	v_rms = register_cmu_us_rms(NULL);
+	v_slt = register_cmu_us_slt(NULL);
+	if (!v_kal || !v_kal16 || !v_awb || !v_rms || !v_slt) {
+		ast_log(LOG_ERROR, "Flite: Failed to register voices.\n");
+		unregister_voices();
+		return AST_MODULE_LOAD_DECLINE;
+	}
 	if (ast_register_application_xml(app, flite_exec)) {
-		ast_config_destroy(cfg);
+		unregister_voices();
 		return AST_MODULE_LOAD_DECLINE;
 	}
 	return AST_MODULE_LOAD_SUCCESS;

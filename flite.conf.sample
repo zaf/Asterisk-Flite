@@ -11,6 +11,10 @@
 ; The cache is never cleared (yet), so you must take care of cleaning it
 ; yourself (just delete any or all files from the cache).
 ; THIS DIRECTORY *MUST* EXIST and must be writable from the asterisk process.
+; For security it should be owned by the asterisk user and NOT be world
+; writable (a shared directory like /tmp allows other local users to
+; inject audio into your calls). Cached prompts are stored on disk
+; unencrypted; avoid caching if your prompts contain sensitive data.
 ; Defaults to /tmp/
 ;
 ;cachedir=/var/lib/asterisk/flitecache/
