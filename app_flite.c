@@ -49,6 +49,7 @@
 #define AST_MODULE "Flite"
 #define FLITE_CONFIG "flite.conf"
 #define MAXLEN 2048
+#define MAXTEXT 32768
 #define DEF_RATE 8000
 #define DEF_VOICE "kal"
 #define DEF_DIR "/tmp"
@@ -227,6 +228,10 @@ static int flite_exec(struct ast_channel *chan, const char *data)
 	if (ast_strlen_zero(args.text)) {
 		ast_log(LOG_WARNING, "Flite: No text passed for synthesis.\n");
 		return res;
+	}
+	if (strlen(args.text) > MAXTEXT) {
+		ast_log(LOG_WARNING, "Flite: Text too long (max %d bytes).\n", MAXTEXT);
+		return -1;
 	}
 
 	ast_debug(1, "Flite:\nText passed: %s\nInterrupt key(s): %s\nVoice: %s\nRate: %d\n",
