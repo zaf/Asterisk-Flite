@@ -10,14 +10,14 @@
 ; If usecache=yes, a directory to store waveform cache files.
 ; The cache is never cleared (yet), so you must take care of cleaning it
 ; yourself (just delete any or all files from the cache).
-; THIS DIRECTORY *MUST* EXIST and must be writable from the asterisk process.
-; For security it should be owned by the asterisk user and NOT be world
-; writable (a shared directory like /tmp allows other local users to
-; inject audio into your calls). Cached prompts are stored on disk
-; unencrypted; avoid caching if your prompts contain sensitive data.
-; Defaults to /tmp/
+; The directory is created (mode 0700) if missing. It MUST be owned by the
+; asterisk user and MUST NOT be group or world writable, otherwise caching
+; is disabled (a shared directory would allow other local users to inject
+; audio into your calls). Cached prompts are stored on disk unencrypted;
+; avoid caching if your prompts contain sensitive data.
+; Defaults to /var/lib/asterisk/flitecache
 ;
-;cachedir=/var/lib/asterisk/flitecache/
+;cachedir=/var/lib/asterisk/flitecache
 ;
 ; Voice name (defaults to kal)
 ; 
@@ -36,3 +36,12 @@
 ;
 ;samplerate=16000
 ;
+; Maximum length of the text argument in bytes, 1 to 32768.
+; Longer requests are rejected. (default is 4096)
+;
+;maxtext=4096
+;
+; NOTE: when the selected voice's native rate differs from 'samplerate',
+; flite's resampler adds ~110-250ms of trailing silence to each prompt
+; (cached prompts included). For exact-length audio use kal at 8000 or
+; kal16 (voice=kal, samplerate=16000).

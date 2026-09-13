@@ -54,3 +54,18 @@ License v2. See COPYING for details.
 Homepage
 --------
 http://zaf.github.io/Asterisk-Flite/
+
+------------------
+Known issues/notes
+------------------
+- flite's internal resampler (used when 'samplerate' differs from the chosen
+  voice's native rate) performs an overlapping memcpy (undefined behaviour,
+  reported upstream) and pads each resampled prompt with ~110-250ms of
+  trailing silence, which also ends up in cached files. Prefer voice/rate
+  combinations that need no resampling (kal at 8000, kal16 at 16000).
+- flite's G.721 voice-data decoder contains benign undefined behaviour
+  (negative left shifts); reported upstream.
+- On out-of-memory flite terminates the calling process by design
+  (cst_error/exit). The 'maxtext' limit bounds the realistic trigger.
+- Do NOT force-unload this module ("module unload -f") while calls are using
+  it: in-flight calls can crash Asterisk. A normal unload is safe.

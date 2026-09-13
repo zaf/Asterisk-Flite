@@ -37,6 +37,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <sys/stat.h>
 #include <flite/flite.h>
 #include "asterisk/app.h"
@@ -50,9 +51,10 @@
 #define FLITE_CONFIG "flite.conf"
 #define MAXLEN 2048
 #define MAXTEXT 32768
+#define DEF_MAXTEXT 4096
 #define DEF_RATE 8000
 #define DEF_VOICE "kal"
-#define DEF_DIR "/tmp"
+#define DEF_DIR "/var/lib/asterisk/flitecache"
 
 /*** DOCUMENTATION
 	<application name="Flite" language="en_US">
@@ -94,6 +96,7 @@ static const char *app = "Flite";
 
 static int target_sample_rate;
 static int usecache;
+static int maxtext;
 static char cachedir[MAXLEN];
 static char voice_name[16];
 
@@ -148,6 +151,7 @@ static int read_config(const char *flite_conf)
 	/* set default values */
 	target_sample_rate = DEF_RATE;
 	usecache = 0;
+	maxtext = DEF_MAXTEXT;
 	ast_copy_string(cachedir, DEF_DIR, sizeof(cachedir));
 	ast_copy_string(voice_name, DEF_VOICE, sizeof(voice_name));
 
@@ -165,6 +169,8 @@ static int read_config(const char *flite_conf)
 
 		if ((temp = ast_variable_retrieve(cfg, "general", "samplerate")))
 			target_sample_rate = parse_int(temp, DEF_RATE, 8000, 16000, "samplerate");
+		if ((temp = ast_variable_retrieve(cfg, "general", "maxtext")))
+			maxtext = parse_int(temp, DEF_MAXTEXT, 1, MAXTEXT, "maxtext");
 	}
 
 	if (target_sample_rate != 8000 && target_sample_rate != 16000) {
@@ -174,11 +180,17 @@ static int read_config(const char *flite_conf)
 	}
 	if (usecache) {
 		struct stat st;
-		if (stat(cachedir, &st) || !S_ISDIR(st.st_mode))
-			ast_log(LOG_WARNING, "Flite: Cache directory %s does not exist\n", cachedir);
-		else if (st.st_mode & S_IWOTH)
-			ast_log(LOG_WARNING,
-					"Flite: Cache directory %s is world-writable, cache can be poisoned\n", cachedir);
+		if (stat(cachedir, &st) && (ast_mkdir(cachedir, 0700) || stat(cachedir, &st))) {
+			ast_log(LOG_ERROR,
+					"Flite: Failed to create cache directory %s, caching disabled\n", cachedir);
+			usecache = 0;
+		} else if (!S_ISDIR(st.st_mode) || st.st_uid != geteuid()
+				|| (st.st_mode & (S_IWGRP | S_IWOTH))) {
+			ast_log(LOG_ERROR,
+					"Flite: Cache directory %s must be owned by the Asterisk user "
+					"and not group/world writable, caching disabled\n", cachedir);
+			usecache = 0;
+		}
 	}
 	ast_rwlock_unlock(&cfg_lock);
 	if (cfg)
@@ -196,7 +208,7 @@ static int flite_exec(struct ast_channel *chan, const char *data)
 	char cachefile[MAXLEN];
 	char tmp_name[MAXLEN + 16];
 	char raw_tmp_name[MAXLEN + 24];
-	int use_cache, t_rate;
+	int use_cache, t_rate, l_maxtext;
 	char l_cachedir[MAXLEN];
 	char l_voice[16];
 	cst_wave *raw_data;
@@ -211,27 +223,29 @@ static int flite_exec(struct ast_channel *chan, const char *data)
 		return -1;
 	}
 
+	ast_rwlock_rdlock(&cfg_lock);
+	use_cache = usecache;
+	t_rate = target_sample_rate;
+	l_maxtext = maxtext;
+	ast_copy_string(l_cachedir, cachedir, sizeof(l_cachedir));
+	ast_copy_string(l_voice, voice_name, sizeof(l_voice));
+	ast_rwlock_unlock(&cfg_lock);
+
+	/* Check before ast_strdupa() copies the data onto the stack. */
+	if (strlen(data) > (size_t) l_maxtext) {
+		ast_log(LOG_WARNING, "Flite: Text too long (max %d bytes).\n", l_maxtext);
+		return -1;
+	}
 	mydata = ast_strdupa(data);
 	AST_STANDARD_APP_ARGS(args, mydata);
 
 	if (args.interrupt && !strcasecmp(args.interrupt, "any"))
 		args.interrupt = AST_DIGIT_ANY;
 
-	ast_rwlock_rdlock(&cfg_lock);
-	use_cache = usecache;
-	t_rate = target_sample_rate;
-	ast_copy_string(l_cachedir, cachedir, sizeof(l_cachedir));
-	ast_copy_string(l_voice, voice_name, sizeof(l_voice));
-	ast_rwlock_unlock(&cfg_lock);
-
 	args.text = ast_strip_quoted(args.text, "\"", "\"");
 	if (ast_strlen_zero(args.text)) {
 		ast_log(LOG_WARNING, "Flite: No text passed for synthesis.\n");
 		return res;
-	}
-	if (strlen(args.text) > MAXTEXT) {
-		ast_log(LOG_WARNING, "Flite: Text too long (max %d bytes).\n", MAXTEXT);
-		return -1;
 	}
 
 	ast_debug(1, "Flite:\nText passed: %s\nInterrupt key(s): %s\nVoice: %s\nRate: %d\n",
@@ -320,7 +334,8 @@ static int flite_exec(struct ast_channel *chan, const char *data)
 	} else {
 		res = -1;
 	}
-	fclose(fl);
+	if (fclose(fl))
+		res = -1;
 
 	if (res) {
 		ast_log(LOG_ERROR, "Flite: Failed to synthesize or write audio file %s\n", tmp_name);
@@ -330,7 +345,9 @@ static int flite_exec(struct ast_channel *chan, const char *data)
 
 	snprintf(raw_tmp_name, sizeof(raw_tmp_name), "%s.%s", tmp_name, format);
 	if (rename(tmp_name, raw_tmp_name)) {
-		ast_log(LOG_ERROR, "Flite: Failed to rename audio file: %s\n", strerror(errno));
+		char ebuf[128];
+		ast_log(LOG_ERROR, "Flite: Failed to rename audio file: %s\n",
+				strerror_r(errno, ebuf, sizeof(ebuf)));
 		unlink(tmp_name);
 		return -1;
 	}
@@ -347,10 +364,14 @@ static int flite_exec(struct ast_channel *chan, const char *data)
 
 	/* Save file to cache if set */
 	if (writecache) {
+		int cfd;
 		ast_debug(1, "Flite: Saving cache file %s\n", cachefile);
+		if ((cfd = open(raw_tmp_name, O_RDONLY)) != -1) {
+			fsync(cfd);
+			close(cfd);
+		}
 		if (ast_filerename(tmp_name, cachefile, format)) {
-			if (ast_filecopy(tmp_name, cachefile, format))
-				ast_log(LOG_WARNING, "Flite: Failed to save cache file %s\n", cachefile);
+			ast_log(LOG_WARNING, "Flite: Failed to save cache file %s\n", cachefile);
 			unlink(raw_tmp_name);
 		}
 	} else {
