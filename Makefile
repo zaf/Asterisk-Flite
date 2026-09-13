@@ -1,6 +1,6 @@
 #
 # Makefile for Asterisk flite application
-# Copyright (C) 2009 - 2016, Lefteris Zafiris
+# Copyright (C) 2009 - 2026, Lefteris Zafiris
 #
 # This program is free software, distributed under the terms of
 # the GNU General Public License Version 2. See the COPYING file
@@ -13,6 +13,12 @@ else
 	MODULES_DIR:=$(INSTALL_PREFIX)$(ASTLIBDIR)
 endif
 ASTETCDIR:=$(INSTALL_PREFIX)/etc/asterisk
+ASTDATADIR:=$(shell awk '/astdatadir/{print $$3}' /etc/asterisk/asterisk.conf 2> /dev/null)
+ifeq ($(strip $(ASTDATADIR)),)
+	ASTDATADIR:=/var/lib/asterisk
+endif
+DOCSDIR:=$(INSTALL_PREFIX)$(ASTDATADIR)/documentation/thirdparty
+XMLDOC:=app_flite-en_US.xml
 SAMPLENAME:=flite.conf.sample
 CONFNAME:=$(basename $(SAMPLENAME))
 
@@ -22,9 +28,18 @@ OPTIMIZE:=-O2
 DEBUG:=-g
 
 LIBS+=-lflite_cmu_us_kal -lflite_cmu_us_kal16 -lflite_cmu_us_awb -lflite_cmu_us_rms -lflite_cmu_us_slt -lflite_usenglish -lflite_cmulex -lflite
-CFLAGS+=-pipe -fPIC -Wall -Wextra -Wstrict-prototypes -Wmissing-prototypes -Wmissing-declarations -D_REENTRANT -D_GNU_SOURCE -DAST_MODULE_SELF_SYM=__internal_app_flite_self
+# keep a flag only if the compiler supports it (older gcc, clang, other arches)
+cc_opt=$(shell $(CC) -Werror $(1) -E -xc /dev/null >/dev/null 2>&1 && echo $(1))
+CFLAGS+=-pipe -fPIC -Wall -Wextra -Wstrict-prototypes -Wmissing-prototypes -Wmissing-declarations \
+	-Wshadow -Wformat=2 $(call cc_opt,-Wnull-dereference) \
+	-D_REENTRANT -D_GNU_SOURCE -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2 \
+	$(call cc_opt,-fstack-protector-strong) $(call cc_opt,-fstack-clash-protection) \
+	-DAST_MODULE_SELF_SYM=__internal_app_flite_self
+LDFLAGS+=-Wl,-z,relro -Wl,-z,now
 
-all: app_flite.so
+.PHONY: all clean install samples
+
+all: app_flite.so $(XMLDOC)
 	@echo " +--------- app_flite Build Complete --------+"
 	@echo " + app_flite has successfully been built,    +"
 	@echo " + and can be installed by running:          +"
@@ -36,14 +51,24 @@ app_flite.o: app_flite.c
 	$(CC) $(CFLAGS) $(DEBUG) $(OPTIMIZE) -c -o $@ $*.c
 
 app_flite.so: app_flite.o
-	$(CC) -shared -Xlinker -x -o $@ $< $(LIBS)
+	$(CC) -shared -o $@ $< $(LDFLAGS) $(LIBS)
+
+$(XMLDOC): app_flite.c
+	@echo '<?xml version="1.0" encoding="UTF-8"?>' > $@
+	@echo '<!DOCTYPE docs SYSTEM "appdocsxml.dtd">' >> $@
+	@echo '<docs xmlns:xi="http://www.w3.org/2001/XInclude">' >> $@
+	@sed -n '/^\/\*\*\* DOCUMENTATION/,/\*\*\*\//p' app_flite.c | sed '1d;$$d' >> $@
+	@echo '</docs>' >> $@
 
 clean:
-	rm -f app_flite.o app_flite.so
+	rm -f app_flite.o app_flite.so $(XMLDOC)
 
 install: all
 	$(INSTALL) -m 755 -d $(DESTDIR)$(MODULES_DIR)
 	$(INSTALL) -m 755 app_flite.so $(DESTDIR)$(MODULES_DIR)
+	$(INSTALL) -m 755 -d $(DESTDIR)$(DOCSDIR)
+	$(INSTALL) -m 644 $(XMLDOC) $(DESTDIR)$(DOCSDIR)
+	@echo " Run 'xmldoc reload' in the Asterisk CLI to load the docs."
 	@echo " +---- app_flite Installation Complete ------+"
 	@echo " +                                           +"
 	@echo " + app_flite has successfully been installed.+"
@@ -60,4 +85,4 @@ samples:
 		mv -f $(DESTDIR)$(ASTETCDIR)/$(CONFNAME) $(DESTDIR)$(ASTETCDIR)/$(CONFNAME).old ; \
 	fi ;
 	$(INSTALL) -m 644 $(SAMPLENAME) $(DESTDIR)$(ASTETCDIR)/$(CONFNAME)
-	@echo " ------- app_flite confing Installed ---------"
+	@echo " ------- app_flite config Installed ----------"

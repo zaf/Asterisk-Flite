@@ -1,0 +1,4 @@
+*.o
+*.so
+*.plist
+app_flite-en_US.xml

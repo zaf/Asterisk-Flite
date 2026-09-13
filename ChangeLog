@@ -1,3 +1,12 @@
+2026-09-13 Lefteris Zafiris <zaf@fastmail.com> - 4.0
+    Fixed cache naming and file handling.
+    Fixed config value parsing. Safer module loading,
+    unloading and Flite initialisation. Fixed crash under
+    concurrent calls. Makefile updates.
+
+2026-09-12 Lefteris Zafiris <zaf@fastmail.com> - 3.0
+	Asterisk 14 compatibility fixes.
+
 2016-03-20 Lefteris Zafiris <zaf@fastmail.com> - 2.3
 	Proper temp file generation and handling - Security Fix -
 
@@ -6,7 +15,6 @@
 	Fixed compatibility with asterisk 11.
 	Code cleanups. Better error handling in config file parsing.
 	Fixed unresolved symbol issues with ubuntu based distros.
-
 
 2012-08-19 Lefteris Zafiris <zaf@fastmail.com> - 2.2-rc1
 	Fixed compatibility with asterisk 11
